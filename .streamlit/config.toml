@@ -29,3 +29,6 @@ chartCategoricalColors = ["#F2690F", "#4DA3FF", "#2ECC71", "#A78BFA", "#FF5A5F",
 
 [server]
 maxUploadSize = 20
+
+[client]
+toolbarMode = "minimal"      # no developer buttons (Deploy, Rerun) for visitors

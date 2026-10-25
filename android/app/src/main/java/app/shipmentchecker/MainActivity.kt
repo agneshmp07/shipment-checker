@@ -66,6 +66,10 @@ class MainActivity : ComponentActivity() {
                 return true
             }
 
+            override fun onPageFinished(view: WebView, url: String) {
+                view.evaluateJavascript(HIDE_HOSTING_BADGES, null)
+            }
+
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
                 if (request.isForMainFrame) {
                     view.loadDataWithBaseURL(null, offlinePage(), "text/html", "utf-8", null)
@@ -145,6 +149,21 @@ class MainActivity : ComponentActivity() {
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(this, "No app can open this link.", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    companion object {
+        // Streamlit Community Cloud adds a "Hosted with Streamlit" link and the creator's avatar
+        // around the app. They aren't part of ShipCheck, so the phone app hides them.
+        private const val HIDE_HOSTING_BADGES = """
+            (function () {
+              if (document.getElementById('shipcheck-hide-badges')) return;
+              var s = document.createElement('style');
+              s.id = 'shipcheck-hide-badges';
+              s.textContent = '[class*="viewerBadge"],[class*="profileContainer"],[data-testid="appCreatorAvatar"]' +
+                              '{display:none !important}';
+              (document.head || document.documentElement).appendChild(s);
+            })();
+        """
     }
 
     private fun offlinePage() = """

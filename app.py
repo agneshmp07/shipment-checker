@@ -16,6 +16,9 @@ for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "GEMINI_API_KEY", "GOOGLE_A
 st.set_page_config(page_title="ShipCheck — shipment pre-flight checker", page_icon=":material/local_shipping:",
                    layout="wide")
 st.logo("assets/logo.svg", size="large")
+# Hide the hosting toolbar (Streamlit Cloud's Fork / GitHub buttons and the ⋮ developer menu):
+# they're about where the app is hosted, not about ShipCheck.
+st.html("<style>[data-testid='stToolbarActions'],[data-testid='stMainMenu']{display:none !important}</style>")
 
 page = st.navigation([
     st.Page("app_pages/home.py", title="Home", icon=":material/home:", default=True),
