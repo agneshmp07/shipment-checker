@@ -16,6 +16,7 @@ from core.report import html_report
 from core.rules import RULE_NAMES
 from core.trade_connect import load_directory, match_buyers
 from ui.brand import carrier_cards, status_banner
+from ui.invoice import render_invoice
 
 STATUS_STYLE = {  # status -> (badge colour, icon)
     "Blocked": ("red", ":material/block:"),
@@ -182,6 +183,8 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
                          icon=":material/arrow_forward:")
         except Exception:      # rendered outside the multipage app (e.g. a test harness)
             st.caption("See all matches and message buyers in the Marketplace.")
+
+    render_invoice(ev, key)
 
     st.download_button("Download booking report (HTML)", html_report(ev),
                        file_name=f"booking_{b.booking_id or 'new'}.html", mime="text/html",
