@@ -4,6 +4,7 @@ import os
 import streamlit as st
 
 from ui.assistant import render_ask_ai
+from ui.brand import global_style
 
 # Streamlit Cloud / HF Spaces secrets -> env vars read by core.llm (never hard-coded).
 for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_MODEL"):
@@ -16,9 +17,7 @@ for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "GEMINI_API_KEY", "GOOGLE_A
 st.set_page_config(page_title="ShipCheck — shipment pre-flight checker", page_icon=":material/local_shipping:",
                    layout="wide")
 st.logo("assets/logo.svg", size="large")
-# Hide the hosting toolbar (Streamlit Cloud's Fork / GitHub buttons and the ⋮ developer menu):
-# they're about where the app is hosted, not about ShipCheck.
-st.html("<style>[data-testid='stToolbarActions'],[data-testid='stMainMenu']{display:none !important}</style>")
+global_style()        # hides the hosting toolbar, adds hover effects
 
 page = st.navigation([
     st.Page("app_pages/home.py", title="Home", icon=":material/home:", default=True),

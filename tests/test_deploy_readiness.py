@@ -132,7 +132,8 @@ def test_every_fixture_booking_renders_without_key(carriers_env):
     at = AppTest.from_function(_render_all_script, args=(str(OUT),), default_timeout=60)
     at.run()
     assert not at.exception
-    assert len([s for s in at.subheader if s.value.startswith("BK-")]) == 14
+    banners = [h for h in at.get("html") if 'class="sc-banner' in h.proto.body]
+    assert len(banners) == 14 and all(">BK-" in h.proto.body for h in banners)
 
 
 def test_every_junk_booking_renders(carriers_env, tmp_path):

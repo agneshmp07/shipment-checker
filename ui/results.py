@@ -15,6 +15,7 @@ from core.confirmation import DELIVERY_ASSUMPTION
 from core.report import html_report
 from core.rules import RULE_NAMES
 from core.trade_connect import load_directory, match_buyers
+from ui.brand import carrier_cards, status_banner
 
 STATUS_STYLE = {  # status -> (badge colour, icon)
     "Blocked": ("red", ":material/block:"),
@@ -89,10 +90,7 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
 
     # Header
     with st.container(border=True):
-        st.subheader(f"{b.booking_id or 'New booking'} · {b.seller_name or 'Seller not set'}")
-        st.caption(f"{b.route} · {b.destination_type or '?'} · ready {fmt.d(b.ready_date)} · "
-                   f"priority {b.seller_priority or '?'}")
-        status_badge(ev)
+        status_banner(ev)
         with st.container(horizontal=True):
             st.metric("Pallets", fmt.num(b.pallets), border=True)
             st.metric("Cartons", fmt.num(b.cartons), border=True)
@@ -150,13 +148,10 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
     # Carrier
     st.markdown("#### :material/local_shipping: Recommended carrier")
     if rec.winner:
-        w = rec.winner
-        with st.container(border=True):
-            st.markdown(f"**{label(w.option)}** — {fmt.money(w.total_cost)} · "
-                        f"{fmt.num(w.option.transit_days)} days · {fmt.num(w.option.on_time_rate)}% on time")
-            st.write(rec.reason)
-            if rec.trade_off:
-                st.caption(f"Trade-off: {rec.trade_off}")
+        carrier_cards(rec)
+        st.write(rec.reason)
+        if rec.trade_off:
+            st.caption(f"Trade-off: {rec.trade_off}")
     else:
         st.error(rec.reason, icon=":material/local_shipping:")
     if rec.all_options:
