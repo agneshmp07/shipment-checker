@@ -28,7 +28,10 @@ def carriers():
 
 
 @pytest.fixture(autouse=True)
-def fresh_streamlit_cache():
-    """st.cache_data lives for the whole test process; isolate each test's rate card."""
+def fresh_streamlit_cache(monkeypatch):
+    """st.cache_data lives for the whole test process; isolate each test's rate card.
+    Also hide any real API keys in the shell, so tests never call a live model."""
     st.cache_data.clear()
+    for k in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "ANTHROPIC_MODEL", "GEMINI_MODEL"):
+        monkeypatch.delenv(k, raising=False)
     yield

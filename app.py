@@ -4,7 +4,7 @@ import os
 import streamlit as st
 
 # Streamlit Cloud / HF Spaces secrets -> env vars read by core.llm (never hard-coded).
-for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_MODEL"):
+for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_MODEL"):
     try:
         if name in st.secrets and not os.environ.get(name):
             os.environ[name] = str(st.secrets[name])

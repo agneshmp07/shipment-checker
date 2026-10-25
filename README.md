@@ -20,7 +20,7 @@ confirmation shows what happens next.
 - **Rules are plain Python** (`core/rules.py`). The LLM never decides pass/fail.
 - **One data model.** Chat and upload both build the same `Booking` (`core/models.py`); everything
   reads from it through one function, `core/check.py::evaluate`.
-- **The LLM is optional.** It only (a) extracts fields from chat text into a validated schema,
+- **The LLM is optional, and either Claude or Gemini works.** It only (a) extracts fields from chat text into a validated schema,
   (b) phrases follow-up questions, and (c) gives "possible dangerous goods — please confirm" hints.
   Without an API key — or if a call fails — chat uses a built-in rule-based parser
   (`core/offline_parser.py`) and everything else is unaffected.
@@ -48,8 +48,14 @@ streamlit run app.py
 ```
 
 Optional, to switch on the AI assistant: copy `.streamlit/secrets.toml.example` to
-`.streamlit/secrets.toml` and fill in `ANTHROPIC_API_KEY` (and optionally `ANTHROPIC_MODEL`,
-default `claude-opus-5-5`). Environment variables with the same names work too.
+`.streamlit/secrets.toml` and set **one** of:
+
+- `ANTHROPIC_API_KEY` (optional `ANTHROPIC_MODEL`, default `claude-opus-5-5`), or
+- `GEMINI_API_KEY` (optional `GEMINI_MODEL`, default `gemini-flash-latest`).
+
+If both are set, Anthropic is used. Environment variables with the same names work too. Both
+providers get the same JSON schema and their replies are validated by the same pydantic models;
+the chat page shows which one is active.
 
 Run the tests (no API key or network needed):
 
@@ -80,7 +86,7 @@ so; if row 3 has been typed over with real data, it is checked like any other ro
    never commit it).
 2. On share.streamlit.io choose **Create app** → your repo → main file `app.py`; under
    *Advanced settings* pick Python 3.11 or later.
-3. Optional: paste `ANTHROPIC_API_KEY = "…"` into the app's **Secrets** box.
+3. Optional: paste `GEMINI_API_KEY = "…"` (or `ANTHROPIC_API_KEY = "…"`) into the app's **Secrets** box.
 4. Deploy, then open the link in a private window to confirm it works without signing in.
 
 ### Hugging Face Spaces
@@ -95,7 +101,7 @@ so; if row 3 has been typed over with real data, it is checked like any other ro
    python_version: "3.11"
    ---
    ```
-3. Optional: add `ANTHROPIC_API_KEY` under *Settings → Variables and secrets* (as a secret).
+3. Optional: add `GEMINI_API_KEY` or `ANTHROPIC_API_KEY` under *Settings → Variables and secrets* (as a secret).
 
 ## Project layout
 
@@ -112,7 +118,7 @@ core/confirmation.py       summary, delivery date, next steps
 core/check.py              evaluate(): the one pipeline every screen uses
 core/diagnosis.py          most likely wrong number, root-cause grouping, apply_fix
 core/chat_agent.py         chat engine: merge, missing fields, proposals, change summary
-core/llm.py                optional Anthropic calls (structured output)
+core/llm.py                optional LLM calls: Anthropic or Gemini (structured output)
 core/offline_parser.py     no-API fallback for chat
 core/report.py             downloadable HTML report
 core/trade_connect.py      Trade Connect directory logic

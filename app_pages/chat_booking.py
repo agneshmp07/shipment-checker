@@ -25,6 +25,9 @@ today = date.today()
 
 st.title("Book by chat")
 carriers = carriers_or_warning()
+if st.session_state.ai_ok:
+    st.caption(f":material/smart_toy: AI assistant: {llm.provider_label()} — it only reads your messages; "
+               "every check is done by fixed rules.")
 if not st.session_state.ai_ok:
     st.info(f"The AI assistant is unavailable ({st.session_state.ai_error}) — using the built-in parser, "
             "which understands simple phrases. You can also use the form below the chat. "

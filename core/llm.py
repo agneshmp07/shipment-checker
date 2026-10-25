@@ -1,14 +1,19 @@
-"""Optional LLM helpers (Anthropic API). Nothing here decides pass/fail.
+"""Optional LLM helpers. Nothing here decides pass/fail.
 
 - llm_extract: chat text -> Extraction (structured output, validated by pydantic)
 - llm_phrase: rewrite the code-built follow-up question in a friendlier way
 - llm_dg_second_opinion: borderline dangerous-goods hints, shown as "please confirm"
 
-Key and model come from ANTHROPIC_API_KEY / ANTHROPIC_MODEL. If the key is
-missing or a call fails, callers fall back to deterministic code.
+Provider, in order of preference:
+  1. Anthropic  - ANTHROPIC_API_KEY (+ optional ANTHROPIC_MODEL)
+  2. Gemini     - GEMINI_API_KEY or GOOGLE_API_KEY (+ optional GEMINI_MODEL)
+  3. none       - callers fall back to deterministic code (offline parser, templates)
+Both providers get the same JSON schema and their replies are validated by the
+same pydantic models, so the rest of the app can't tell them apart.
 """
 from __future__ import annotations
 
+import copy
 import json
 import os
 from datetime import date
@@ -16,6 +21,9 @@ from functools import lru_cache
 from typing import Optional
 
 import anthropic
+from google import genai
+from google.genai import errors as genai_errors
+from google.genai import types as genai_types
 from pydantic import BaseModel, ValidationError
 
 from core.chat_agent import ChatState, Extraction
@@ -24,6 +32,8 @@ from core.models import DESTINATIONS, DESTINATION_TYPES, ITEM_ORIGIN_COUNTRIES, 
 DEFAULT_MODEL = "claude-opus-5-5"
 # Models that accept server-side refusal fallbacks ("default" routing).
 FALLBACK_MODELS = {"claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"}
+GEMINI_DEFAULT_MODEL = "gemini-flash-latest"     # alias that tracks Google's current Flash model
+GEMINI_BACKUP_MODEL = "gemini-2.5-flash"          # tried if the configured model isn't found
 
 
 class LLMUnavailable(Exception):
@@ -34,12 +44,30 @@ class InvalidOutput(Exception):
     """The model answered, but not with valid JSON for the schema."""
 
 
+def _gemini_key() -> Optional[str]:
+    return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+
+
+def provider() -> Optional[str]:
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return "anthropic"
+    if _gemini_key():
+        return "gemini"
+    return None
+
+
+def provider_label() -> str:
+    return {"anthropic": f"Claude ({model()})", "gemini": f"Gemini ({model()})"}.get(provider(), "none")
+
+
 def model() -> str:
+    if provider() == "gemini":
+        return os.environ.get("GEMINI_MODEL") or GEMINI_DEFAULT_MODEL
     return os.environ.get("ANTHROPIC_MODEL") or DEFAULT_MODEL
 
 
 def available() -> bool:
-    return bool(os.environ.get("ANTHROPIC_API_KEY"))
+    return provider() is not None
 
 
 @lru_cache(maxsize=1)
@@ -47,11 +75,24 @@ def _client(key: str) -> anthropic.Anthropic:
     return anthropic.Anthropic(api_key=key, timeout=45.0, max_retries=1)
 
 
+@lru_cache(maxsize=1)
+def _gemini_client(key: str) -> genai.Client:
+    return genai.Client(api_key=key, http_options=genai_types.HttpOptions(timeout=45_000))
+
+
 def _parse(system: str, user: str, schema: type[BaseModel], max_tokens: int = 4000):
-    """One structured-output call. Raises LLMUnavailable on any API problem."""
-    key = os.environ.get("ANTHROPIC_API_KEY")
-    if not key:
-        raise LLMUnavailable("No ANTHROPIC_API_KEY set")
+    """One structured-output call to whichever provider is configured.
+    Raises LLMUnavailable on API problems, InvalidOutput on unusable replies."""
+    p = provider()
+    if p == "anthropic":
+        return _parse_anthropic(system, user, schema, max_tokens)
+    if p == "gemini":
+        return _parse_gemini(system, user, schema, max_tokens)
+    raise LLMUnavailable("No API key is configured")
+
+
+def _parse_anthropic(system: str, user: str, schema: type[BaseModel], max_tokens: int):
+    key = os.environ["ANTHROPIC_API_KEY"]
     kwargs = dict(model=model(), max_tokens=max_tokens, system=system,
                   messages=[{"role": "user", "content": user}], output_format=schema,
                   output_config={"effort": "low"})
@@ -68,6 +109,49 @@ def _parse(system: str, user: str, schema: type[BaseModel], max_tokens: int = 40
     if resp.stop_reason in ("refusal", "max_tokens") or resp.parsed_output is None:
         raise InvalidOutput(f"stop_reason={resp.stop_reason}")
     return resp.parsed_output
+
+
+def _inline_refs(schema: dict) -> dict:
+    """Pydantic puts nested models under $defs; inline them so any JSON-schema reader copes."""
+    defs = schema.get("$defs", {})
+
+    def walk(node):
+        if isinstance(node, dict):
+            if "$ref" in node:
+                return walk(copy.deepcopy(defs[node["$ref"].split("/")[-1]]))
+            return {k: walk(v) for k, v in node.items() if k != "$defs"}
+        if isinstance(node, list):
+            return [walk(v) for v in node]
+        return node
+    return walk(schema)
+
+
+def _parse_gemini(system: str, user: str, schema: type[BaseModel], max_tokens: int):
+    config = genai_types.GenerateContentConfig(
+        system_instruction=system, response_mime_type="application/json",
+        response_json_schema=_inline_refs(schema.model_json_schema()),
+        max_output_tokens=max(max_tokens, 8192))     # thinking models count reasoning here too
+    models = [model()] + ([GEMINI_BACKUP_MODEL] if model() != GEMINI_BACKUP_MODEL else [])
+    resp = None
+    for i, m in enumerate(models):
+        try:
+            resp = _gemini_client(_gemini_key()).models.generate_content(model=m, contents=user, config=config)
+            break
+        except genai_errors.ClientError as e:
+            if e.code == 404 and i < len(models) - 1:
+                continue                             # model name not available: try the backup
+            raise LLMUnavailable(f"Gemini error {e.code}: {e.message}") from e
+        except genai_errors.APIError as e:
+            raise LLMUnavailable(f"Gemini error {e.code}: {e.message}") from e
+        except Exception as e:                       # network / timeout
+            raise LLMUnavailable(f"Gemini unavailable: {e}") from e
+    text = getattr(resp, "text", None)
+    if not text:
+        raise InvalidOutput("Gemini returned no text")
+    try:
+        return schema.model_validate_json(text)
+    except ValidationError as e:
+        raise InvalidOutput(str(e)) from e
 
 
 EXTRACT_SYSTEM = f"""You extract shipment booking details from a seller's chat message.

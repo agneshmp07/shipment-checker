@@ -114,3 +114,76 @@ def test_chat_page_without_key_completes_booking(chat_app):
     texts = [m.value for m in at.markdown]
     assert any(t.startswith("Updated: pallets 3 → 4") for t in texts)
     assert any(b.label == "Confirm booking" for b in at.button)      # results + confirm shown
+
+
+# ---- Gemini provider (fake client, no network) --------------------------------------
+
+from google.genai import errors as genai_errors
+
+
+class FakeGeminiModels:
+    def __init__(self, outputs):
+        self.outputs, self.calls = list(outputs), []
+
+    def generate_content(self, model, contents, config):
+        self.calls.append({"model": model, "contents": contents, "config": config})
+        out = self.outputs.pop(0)
+        if isinstance(out, Exception):
+            raise out
+        return SimpleNamespace(text=out)
+
+
+def fake_gemini(monkeypatch, outputs):
+    models = FakeGeminiModels(outputs)
+    monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
+    monkeypatch.setattr(llm, "_gemini_client", lambda key: SimpleNamespace(models=models))
+    return models
+
+
+def test_gemini_selected_when_only_gemini_key(monkeypatch):
+    want = Extraction(origin_city="Leeds", items=[ItemPatch(description="mugs", quantity=10)])
+    calls = fake_gemini(monkeypatch, [want.model_dump_json()])
+    assert llm.provider() == "gemini" and llm.available()
+    assert llm.llm_extract("10 mugs from Leeds", ChatState(), TODAY) == want
+    call = calls.calls[0]
+    assert call["model"] == "gemini-flash-latest"
+    cfg = call["config"]
+    assert cfg.response_mime_type == "application/json"
+    assert "$ref" not in json.dumps(cfg.response_json_schema)          # nested models inlined
+    assert "items" in cfg.response_json_schema["properties"]
+    assert "Allowed values" in cfg.system_instruction and "25-10-2026" in call["contents"]
+
+
+def test_anthropic_preferred_when_both_keys(monkeypatch):
+    fake_gemini(monkeypatch, [])
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
+    assert llm.provider() == "anthropic"
+
+
+def test_gemini_unknown_model_falls_back(monkeypatch):
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-does-not-exist")
+    not_found = genai_errors.ClientError(404, {"error": {"code": 404, "message": "not found", "status": "NOT_FOUND"}})
+    calls = fake_gemini(monkeypatch, [not_found, Extraction(pallets=2).model_dump_json()])
+    assert llm.llm_extract("2 pallets", ChatState(), TODAY).pallets == 2
+    assert [c["model"] for c in calls.calls] == ["gemini-does-not-exist", "gemini-2.5-flash"]
+
+
+def test_gemini_quota_error_is_unavailable(monkeypatch):
+    quota = genai_errors.ClientError(429, {"error": {"code": 429, "message": "quota", "status": "RESOURCE_EXHAUSTED"}})
+    fake_gemini(monkeypatch, [quota])
+    with pytest.raises(llm.LLMUnavailable):
+        llm.llm_extract("hi", ChatState(), TODAY)
+
+
+def test_gemini_bad_json_retried_then_unavailable(monkeypatch):
+    calls = fake_gemini(monkeypatch, ["not json", '{"pallets": "three"}'])
+    with pytest.raises(llm.LLMUnavailable):
+        llm.llm_extract("hi", ChatState(), TODAY)
+    assert len(calls.calls) == 2
+
+
+def test_gemini_phrase_and_dg(monkeypatch):
+    fake_gemini(monkeypatch, ['{"text": "Lovely! How many pallets?"}',
+                              '{"hints": [{"sku": "EB-1", "reason": "earbuds contain a lithium battery"}]}'])
+    assert llm.llm_phrase(ChatState(), [], "How many pallets?") == "Lovely! How many pallets?"
+    assert llm.llm_dg_second_opinion([("EB-1", "Wireless earbuds")])[0].sku == "EB-1"
