@@ -159,6 +159,12 @@ def _latin(s: str) -> str:
             .encode("latin-1", "replace").decode("latin-1"))
 
 
+def _cut(s, n: int) -> str:
+    """Latin-1 text, shortened so one cell can't grow taller than a page."""
+    s = _latin(str(s or ""))
+    return s if len(s) <= n else s[:n - 3] + "..."
+
+
 def invoice_pdf(inv: Invoice) -> bytes:
     pdf = FPDF(format="A4")
     pdf.set_auto_page_break(True, margin=15)
@@ -187,7 +193,7 @@ def invoice_pdf(inv: Invoice) -> bytes:
         pdf.set_font("Helvetica", "", 9)
         for ln in lines:
             pdf.set_text_color(*(orange if TODO in ln else navy))
-            pdf.multi_cell(w, 4.6, _latin(ln), new_x="LEFT", new_y="NEXT")
+            pdf.multi_cell(w, 4.6, _cut(ln, 160), new_x="LEFT", new_y="NEXT")
         return pdf.get_y()
 
     y0 = pdf.get_y()
@@ -204,7 +210,7 @@ def invoice_pdf(inv: Invoice) -> bytes:
             pdf.set_text_color(*grey)
             pdf.cell(38, 5, _latin(k))
             pdf.set_text_color(*(orange if TODO in v else navy))
-            pdf.multi_cell(0, 5, _latin(v), new_x="LMARGIN", new_y="NEXT")
+            pdf.multi_cell(0, 5, _cut(v, 400), new_x="LMARGIN", new_y="NEXT")
         pdf.ln(1)
 
     pairs("References and terms", inv.references)
@@ -215,7 +221,8 @@ def invoice_pdf(inv: Invoice) -> bytes:
             "LEFT", "LEFT", "LEFT", "LEFT", "RIGHT", "RIGHT", "RIGHT", "RIGHT", "RIGHT"), line_height=5) as t:
         t.row(["SKU", "Description", "HS code", "Origin", "Qty", "Unit £", "Total £", "Ctns", "Net kg"])
         for l in inv.lines:
-            t.row([_latin(l.sku), _latin(l.description), l.hs_code, _latin(l.origin), fmt.num(l.quantity),
+            t.row([_cut(l.sku, 30), _cut(l.description, 150), _cut(l.hs_code, 14), _cut(l.origin, 30),
+                   fmt.num(l.quantity),
                    f"{l.unit_price:,.2f}", f"{l.total:,.2f}", fmt.num(l.cartons), fmt.num(l.net_weight_kg)])
     pdf.ln(2)
     pdf.set_font("Helvetica", "", 9)

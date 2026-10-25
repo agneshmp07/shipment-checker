@@ -13,7 +13,7 @@ from core.check import Evaluation, evaluate
 from core.diagnosis import apply_fix, diagnose
 from core.confirmation import DELIVERY_ASSUMPTION
 from core.dangerous_goods import possible_battery
-from core.labels import labels_pdf
+from core.labels import MAX_LABELS, label_count, labels_pdf
 from core.report import html_report
 from core.rules import RULE_NAMES
 from core.trade_connect import load_directory, match_buyers
@@ -192,12 +192,15 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
         consignee = None
         if inv is not None:
             consignee = (inv.buyer_name if inv.consignee_same_as_buyer else inv.consignee_name) or None
+        too_many = label_count(b) > MAX_LABELS
         with st.container(horizontal=True):
             st.download_button("Carton labels (PDF)", lambda: labels_pdf(b, consignee),   # built on click
                                file_name=f"labels_{b.booking_id or 'new'}.pdf", mime="application/pdf",
-                               icon=":material/label:", key=f"{key}-labels", type="primary",
-                               help="One label per carton — “Carton 1 of 90” — with product, units, "
-                                    "from / to and a barcode. 8 labels per A4 sheet.")
+                               icon=":material/label:", key=f"{key}-labels", type="primary", disabled=too_many,
+                               help=(f"{label_count(b):,} cartons is more than the {MAX_LABELS:,} labels we print "
+                                     "at once — check the carton counts." if too_many else
+                                     "One label per carton — “Carton 1 of 90” — with product, units, "
+                                     "from / to and a barcode. 8 labels per A4 sheet."))
             st.download_button("Booking report", lambda: html_report(ev),
                                file_name=f"booking_{b.booking_id or 'new'}.html", mime="text/html",
                                icon=":material/download:", key=f"{key}-download")

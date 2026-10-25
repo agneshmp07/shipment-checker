@@ -7,6 +7,7 @@ and an empty booking list.
 """
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
@@ -88,12 +89,16 @@ def parse_number(v: Any) -> tuple[Optional[float], Optional[str]]:
     if isinstance(v, bool):
         return None, f"'{v}' is not a number"
     if isinstance(v, (int, float)):
-        return float(v), None
-    s = re.sub(r"(?i)[£,\s]|gbp|kgs?$", "", str(v).strip())
-    try:
-        return float(s), None
-    except ValueError:
+        n = float(v)
+    else:
+        s = re.sub(r"(?i)[£,\s]|gbp|kgs?$", "", str(v).strip())
+        try:
+            n = float(s)
+        except ValueError:
+            return None, f"'{v}' is not a number"
+    if not math.isfinite(n):                     # 'nan', 'inf', '1e999'
         return None, f"'{v}' is not a number"
+    return n, None
 
 
 def parse_date(v: Any) -> tuple[Optional[date], Optional[str]]:
@@ -180,13 +185,25 @@ def find_sheet(wb, keyword: str, position: Optional[int]):
     return None
 
 
-def read_table(ws, columns: dict[str, str]) -> tuple[list[tuple[int, dict]], list[str]]:
+MAX_BLANK_RUN = 1000     # stop after this many empty rows in a row (a stray cell far down the sheet)
+
+
+def read_table(ws, columns: dict[str, str], notes: Optional[list[str]] = None
+               ) -> tuple[list[tuple[int, dict]], list[str]]:
     """Return ([(excel_row_number, {field: raw_value})], unknown_headers).
 
     The header row is the first row (within the top 15) that has a
     'Booking ID' cell, so title rows above the table are tolerated.
     """
-    rows = list(ws.iter_rows(values_only=True))
+    rows, blank_run = [], 0
+    for row in ws.iter_rows(values_only=True):
+        rows.append(row)
+        blank_run = blank_run + 1 if all(is_blank(c) for c in row) else 0
+        if blank_run > MAX_BLANK_RUN:
+            if notes is not None and ws.max_row > len(rows):
+                notes.append(f"Stopped reading sheet “{ws.title}” after {MAX_BLANK_RUN:,} empty rows (at row "
+                             f"{len(rows):,}); anything further down, up to row {ws.max_row:,}, was ignored.")
+            break
     header_idx = None
     for i, row in enumerate(rows[:15]):
         if any(norm(c) == "booking id" for c in row):
@@ -395,8 +412,9 @@ def load_workbook(source) -> LoadResult:
 
     ws_b = find_sheet(wb, "booking", 0)
     ws_i = find_sheet(wb, "item", 1)
-    b_rows, b_unknown = read_table(ws_b, BOOKING_COLUMNS) if ws_b else ([], [])
-    i_rows, i_unknown = read_table(ws_i, ITEM_COLUMNS) if ws_i and ws_i is not ws_b else ([], [])
+    b_rows, b_unknown = read_table(ws_b, BOOKING_COLUMNS, result.notes) if ws_b else ([], [])
+    i_rows, i_unknown = (read_table(ws_i, ITEM_COLUMNS, result.notes) if ws_i and ws_i is not ws_b
+                         else ([], []))
 
     if not b_rows:
         result.file_issues.append(data_issue("Red", "No bookings found",

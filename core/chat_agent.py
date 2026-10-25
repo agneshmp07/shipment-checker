@@ -11,11 +11,12 @@ The LLM never decides pass/fail; it only extracts and (optionally) phrases quest
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Callable, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from core import fmt
 from core.check import Evaluation, evaluate
@@ -27,6 +28,10 @@ from core.models import (
 )
 
 # ---- What the extractor returns -------------------------------------------
+
+
+def _finite(v):
+    return v if v is None or math.isfinite(v) else None     # NaN / infinity: treat as not said
 
 
 class ItemPatch(BaseModel):
@@ -42,6 +47,9 @@ class ItemPatch(BaseModel):
     cartons: Optional[float] = None
     unit_weight_kg: Optional[float] = None
     country_of_origin: Optional[str] = None
+
+    _numbers = field_validator("quantity", "unit_price", "units_per_carton", "cartons", "unit_weight_kg")(
+        lambda v: _finite(v))
 
 
 class Extraction(BaseModel):
@@ -63,6 +71,9 @@ class Extraction(BaseModel):
                                               "calculated values we proposed, false if they reject them")
     unknown_fields: list[str] = Field(default_factory=list, description="fields the user says they don't "
                                       "know, e.g. ['hs_code'] or ['country_of_origin']")
+
+    _numbers = field_validator("pallets", "cartons", "total_declared_value", "total_gross_weight_kg")(
+        lambda v: _finite(v))
 
 
 # ---- Field labels and question order --------------------------------------

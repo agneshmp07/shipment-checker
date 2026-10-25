@@ -2,6 +2,8 @@
 what was declared. Eight labels per A4 sheet (2 x 4), each with a Code 39 barcode."""
 from __future__ import annotations
 
+import math
+import re
 from typing import Optional
 
 from fpdf import FPDF
@@ -13,6 +15,7 @@ from core.models import Booking
 COLS, ROWS = 2, 4
 W, H = 95, 68          # label size in mm
 X0, Y0 = 10, 12        # page margins in mm
+MAX_LABELS = 2000      # 250 sheets; more than this is almost always a typo in the carton count
 
 
 class Label(BaseModel):
@@ -24,14 +27,24 @@ class Label(BaseModel):
     origin: str
 
 
+def _count(v) -> int:
+    return int(v) if v is not None and math.isfinite(v) and v > 0 else 0
+
+
+def label_count(b: Booking) -> int:
+    return sum(_count(it.cartons) for it in b.items)
+
+
 def carton_list(b: Booking) -> list[Label]:
     """One entry per carton, numbered across all items. The last carton of an item holds whatever
-    is left over when the quantity doesn't divide evenly."""
+    is left over when the quantity doesn't divide evenly. Empty above MAX_LABELS cartons."""
+    if label_count(b) > MAX_LABELS:
+        return []
     plan = []
     for it in b.items:
-        cartons = int(it.cartons or 0)
-        per = it.units_per_carton or 0
-        qty = it.quantity or 0
+        cartons = _count(it.cartons)
+        per = it.units_per_carton if it.units_per_carton is not None and math.isfinite(it.units_per_carton) else 0
+        qty = it.quantity if it.quantity is not None and math.isfinite(it.quantity) else 0
         for n in range(cartons):
             units = per if n < cartons - 1 else (qty - per * (cartons - 1) if qty and per else per)
             plan.append((it, max(units, 0)))
@@ -94,7 +107,7 @@ def labels_pdf(b: Booking, consignee: Optional[str] = None) -> bytes:
         pdf.set_xy(x + 17, y + 42)
         pdf.cell(W - 21, 4.5, _latin(from_line[:50]))
 
-        code = f"{bid}-{lab.number:03d}"
+        code = re.sub(r"[^0-9A-Z. $/+%-]", "-", f"{bid}-{lab.number:03d}")   # Code 39 characters only
         pdf.code39(f"*{code}*", x + 4, y + 49, w=0.3, h=10)
         pdf.set_font("Helvetica", "", 7)
         pdf.set_text_color(*grey)
@@ -103,5 +116,8 @@ def labels_pdf(b: Booking, consignee: Optional[str] = None) -> bytes:
     if not labels:
         pdf.add_page()
         pdf.set_font("Helvetica", "", 12)
-        pdf.cell(0, 10, "No cartons to label: add carton counts to the items first.")
+        n = label_count(b)
+        pdf.multi_cell(0, 7, f"{n:,} cartons is more than the {MAX_LABELS:,} labels we print at once - please "
+                       "check the carton counts in this booking." if n > MAX_LABELS
+                       else "No cartons to label: add carton counts to the items first.")
     return bytes(pdf.output())

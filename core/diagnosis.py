@@ -275,6 +275,8 @@ def _diag_r07(b: Booking) -> Optional[RootCause]:
         name = it.sku or it.description or "item"
         for factor in (10, 100):
             w2 = round(it.unit_weight_kg / factor, 6)
+            if gross + 1e-9 < goods - (it.unit_weight_kg - w2) * it.quantity:
+                continue                            # still too heavy: skip the costly simulation
             action = {"target": "item", "sku": it.sku, "field": "unit_weight_kg", "value": w2}
             sim = _with(b, action)
             if _passes(rules.r07_gross_weight, sim):
