@@ -21,7 +21,8 @@ page_title("Check a bookings file", "Upload your Bookings and Items sheets and s
            "against the 10 rules in seconds.")
 how_to("upload", [
     ("Upload or try the sample", "Pick your .xlsx file (the case template, filled in from row 4), or tap "
-                                 "Try the sample file to see 14 bookings with planted mistakes."),
+                                 "Try the sample file. There's no submit button — it's checked as soon as "
+                                 "it uploads."),
     ("Read the dashboard", "See how many bookings are ready, need warnings checked, or are blocked, and "
                            "the most common mistake."),
     ("Open a booking and fix it", "Tap a row. Each problem shows the real numbers, why it matters and a "
@@ -57,8 +58,17 @@ file_issues = st.session_state.get("upload_file_issues", [])
 if bookings is None:
     st.stop()
 
+# No submit button is needed: say clearly that the file has been checked and where the results are.
+if bookings:
+    n = len(bookings)
+    st.success(f"Checked {n} booking{'s' if n != 1 else ''} from {st.session_state.upload_name} — "
+               "[jump to the results ↓](#results)", icon=":material/task_alt:")
+else:
+    st.error("We couldn't find any bookings in this file. The problems are listed below.",
+             icon=":material/error:")
+
 st.divider()
-st.subheader(f"Results — {st.session_state.upload_name}")
+st.subheader(f"Results — {st.session_state.upload_name}", anchor="results")
 if file_issues:
     with st.expander(f"{len(file_issues)} problem(s) with the file itself", icon=":material/error:",
                      expanded=not bookings):
