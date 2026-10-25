@@ -1,0 +1,6 @@
+# Runtime dependencies (tested with the versions in brackets). Python 3.11+.
+streamlit>=1.63,<2      # (1.63.0) st.badge, horizontal containers, dialogs
+pandas>=2.2,<4          # (3.0.5)
+openpyxl>=3.1,<4        # (3.1.5)
+pydantic>=2.7,<3        # (2.13.5)
+anthropic>=1.8,<2       # (1.8.0) optional at runtime: the app works without an API key

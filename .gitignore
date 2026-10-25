@@ -1,0 +1,10 @@
+.streamlit/secrets.toml
+__pycache__/
+.pytest_cache/
+*.pyc
+.venv/
+
+# Organisers' documents stay local (the repo is public for deployment).
+# data/carriers.json built from the template IS committed.
+docs/
+Case2_*.xlsx
