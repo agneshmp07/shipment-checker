@@ -65,7 +65,7 @@ def test_change_that_breaks_a_rule_is_reported():
                 "Cheapest. We're Northfield Goods and the slot is booked"]:
         say(s, msg)
     r = say(s, "actually the slot is not booked")
-    assert "delivery slot booked → not booked" in r and "R-08" in r
+    assert "delivery slot booked → not booked" in r and "No delivery appointment at warehouse" in r
 
 
 def test_rejects_values_outside_allowed_lists():

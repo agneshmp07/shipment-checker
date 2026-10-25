@@ -36,13 +36,6 @@ how_to("chat", [
                         "complete you see the full checks, carrier and confirmation below."),
 ])
 carriers = carriers_or_warning()
-if st.session_state.ai_ok:
-    st.caption(f":material/smart_toy: AI assistant: {llm.provider_label()} — it only reads your messages; "
-               "every check is done by fixed rules.")
-if not st.session_state.ai_ok:
-    st.info(f"The AI assistant is unavailable ({st.session_state.ai_error}) — using the built-in parser, "
-            "which understands simple phrases. You can also use the form below the chat. "
-            "All checks work exactly the same.", icon=":material/smart_toy:")
 
 
 def extract(text, s, today):
@@ -109,8 +102,6 @@ with chat_col:
     with st.container(horizontal=True, vertical_alignment="center"):
         st.toggle("Read replies aloud", key="speak_replies", help="The assistant speaks its questions. "
                   "Turns on automatically when you use the mic.")
-        if not voice_in:
-            st.caption(":material/mic_off: Voice input needs the Gemini key.")
     say_next = st.session_state.pop("say_next", None)
     if say_next:
         say(say_next)
@@ -164,8 +155,7 @@ with card_col:
         shown = ev.issues if is_complete(state) else real_issues(ev.issues, b)
         reds = sum(i.severity == "Red" for i in shown)
         if shown:
-            st.caption(f"Checks so far: {reds} red, {len(shown) - reds} amber — "
-                       + "; ".join(f"{i.rule_id} {i.title}" for i in shown))
+            st.caption(f"To fix so far: " + "; ".join(i.title for i in shown))
 
 # ---- Form fallback -------------------------------------------------------------
 with st.expander("Prefer a form? Fill in or correct any field here", icon=":material/edit_note:"):

@@ -15,8 +15,8 @@ COUNTRIES = ["United Kingdom", "Germany", "France", "Netherlands"]
 
 page_title("Marketplace", "Find buyers and sellers across the UK, Germany, France and the Netherlands — "
            "and get matched with buyers for the goods you're shipping.")
-st.badge("Demo data — sample businesses, not real companies; replies are automatic", color="violet",
-         icon=":material/science:")
+st.badge("Demo data", color="violet", icon=":material/science:",
+         help="Sample businesses, not real companies. Replies in the inbox are automatic.")
 how_to("market", [
     ("Find partners", "Search and filter businesses by country, buyer or seller, and category."),
     ("See your matches", "After you book or upload, we suggest buyers who want those goods — in your "

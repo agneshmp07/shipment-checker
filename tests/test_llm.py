@@ -102,7 +102,7 @@ def chat_app(tmp_path, monkeypatch):
 def test_chat_page_without_key_completes_booking(chat_app):
     at = chat_app
     assert not at.exception
-    assert any("AI assistant is unavailable" in i.value for i in at.info)
+    assert not any("unavailable" in i.value or "API key" in i.value for i in at.info)   # no tech notices
     for msg in ["I'm sending 1080 mugs from Manchester to a warehouse in Frankfurt",
                 "They're £5 each, 12 per carton, 0.5 kg each",
                 "yes. HS code 691200, made in United Kingdom",

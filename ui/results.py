@@ -126,7 +126,7 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
                         f"confidence] **{rc.title}**")
             st.write(rc.explanation)
             explained = [by_key[k] for k in rc.fixes if k in by_key]
-            st.caption("Explains: " + " · ".join(f"{i.severity} {i.rule_id} {i.title}" for i in explained))
+            st.caption("Explains: " + " · ".join(i.title for i in explained))
             with st.expander("Show the details of these issues"):
                 for m, issue in enumerate(explained):
                     render_issue(issue, f"{key}-root{n}-{m}")
@@ -144,7 +144,8 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
                        "This is an AI suggestion only; it does not change the status.",
                        icon=":material/help:")
     if ev.issues and passed:
-        st.caption("Passed: " + " · ".join(f"✅ {r} {RULE_NAMES[r]}" for r in passed))
+        with st.expander(f"See the {len(passed)} checks that passed", icon=":material/check_circle:"):
+            st.markdown(" · ".join(f"✅ {RULE_NAMES[r]}" for r in passed))
 
     # Carrier
     st.markdown("#### :material/local_shipping: Recommended carrier")
@@ -170,7 +171,7 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
     # Confirmation + next steps
     st.markdown("#### :material/assignment_turned_in: Confirmation")
     (st.info if ev.status == "Blocked" else st.success)(ev.summary)
-    st.caption(DELIVERY_ASSUMPTION)
+    st.caption("Delivery date is an estimate.", help=DELIVERY_ASSUMPTION)
 
     st.markdown("#### :material/timeline: What happens next")
     for n, s in enumerate(ev.next_steps, 1):

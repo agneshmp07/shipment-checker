@@ -60,8 +60,6 @@ if file_issues:
                      expanded=not bookings):
         for n, issue in enumerate(file_issues):
             render_issue(issue, f"file-{n}")
-for note in st.session_state.get("upload_notes", []):
-    st.caption(f":material/info: {note}")
 if not bookings:
     st.stop()
 

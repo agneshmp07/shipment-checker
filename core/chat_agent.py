@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from core import fmt
 from core.check import Evaluation, evaluate
+from core.rules import TITLES as TITLES_BY_RULE
 from core.excel_loader import match_choice, parse_date
 from core.models import (
     DESTINATIONS, DESTINATION_TYPES, ITEM_ORIGIN_COUNTRIES, ORIGIN_CITIES, PRIORITIES,
@@ -351,39 +352,63 @@ def real_issues(issues: list, b: Booking) -> list:
     return [i for i in issues if not not_asked_yet(i)]
 
 
+def _added(f: str, v, name: str = "") -> str:
+    """A newly given value in plain words: 'from Manchester', '1,080 mugs', '£5.00 each'."""
+    phrases = {
+        "seller_name": lambda: f"seller {v}", "origin_city": lambda: f"from {v}", "destination_city": lambda: f"to {v}",
+        "destination_type": lambda: str(v).lower(), "ready_date": lambda: f"ready {fmt.d(v)}",
+        "seller_priority": lambda: f"{str(v).lower()} option", "pallets": lambda: f"{fmt.num(v)} pallet{'s' if v != 1 else ''}",
+        "cartons": lambda: f"{fmt.num(v)} cartons in total", "total_declared_value": lambda: f"{fmt.money(v)} declared",
+        "total_gross_weight_kg": lambda: f"{fmt.kg(v)} gross", "delivery_appointment_booked":
+            lambda: "delivery slot booked" if v else "no delivery slot yet",
+        "quantity": lambda: f"{fmt.num(v)} {name}", "unit_price": lambda: f"{fmt.money(v)} each",
+        "units_per_carton": lambda: f"{fmt.num(v)} per carton", "item_cartons": lambda: f"{fmt.num(v)} cartons of {name}",
+        "unit_weight_kg": lambda: f"{fmt.kg(v)} each", "hs_code": lambda: f"HS code {v}",
+        "country_of_origin": lambda: f"made in {v}",
+    }
+    return phrases[f]()
+
+
 def change_summary(before: Booking, before_ev: Evaluation, after: Booking, after_ev: Evaluation,
                    complete: bool = True) -> str:
-    changes = []
+    """'Got it: …' for newly given details, 'Updated: old → new' for changed ones, plus what that did
+    to weight per pallet, cost, carrier and the checks."""
+    added, changes = [], []
     for f, label in SUMMARY_FIELDS.items():
         old, new = getattr(before, f), getattr(after, f)
         if old != new:
-            changes.append(f"{label} {_show(f, old)} → {_show(f, new)}" if old is not None
-                           else f"{label} {_show(f, new)}")
+            if old is None:
+                added.append(_added(f, new))
+            else:
+                changes.append(f"{label} {_show(f, old)} → {_show(f, new)}")
     old_items = {i.sku: i for i in before.items}
     for it in after.items:
         prev = old_items.get(it.sku)
         name = it.description or it.sku
-        if prev is None:
-            changes.append(f"new item: {name}")
         for f in ("quantity", "unit_price", "units_per_carton", "cartons", "unit_weight_kg",
                   "hs_code", "country_of_origin"):
             old, new = (getattr(prev, f) if prev else None), getattr(it, f)
             if old != new:
-                label = f.replace("_kg", "").replace("_", " ")
-                changes.append(f"{name} {label} {_show(f, old)} → {_show(f, new)}" if old is not None
-                               else f"{name} {label} {_show(f, new)}")
-    if not changes:
+                if old is None:
+                    added.append(_added("item_cartons" if f == "cartons" else f, new, name))
+                else:
+                    label = f.replace("_kg", "").replace("_", " ")
+                    changes.append(f"{name} {label} {_show(f, old)} → {_show(f, new)}")
+        if prev is None and it.quantity is None:
+            added.append(name)
+    if not added and not changes:
         return ""
+    effects = []
     r0, r1 = before_ev.recommendation, after_ev.recommendation
-    if r0.weight_per_pallet != r1.weight_per_pallet and r1.weight_per_pallet is not None:
-        changes.append(f"weight per pallet {fmt.kg(r0.weight_per_pallet)} → {fmt.kg(r1.weight_per_pallet)}"
-                       if r0.weight_per_pallet else f"weight per pallet {fmt.kg(r1.weight_per_pallet)}")
     c0 = r0.winner.total_cost if r0.winner else None
     c1 = r1.winner.total_cost if r1.winner else None
-    if c1 is not None and c0 != c1:
-        changes.append(f"cost {fmt.money(c0)} → {fmt.money(c1)}" if c0 is not None else f"cost {fmt.money(c1)}")
+    if changes:
+        if r0.weight_per_pallet != r1.weight_per_pallet and r1.weight_per_pallet is not None and r0.weight_per_pallet:
+            effects.append(f"weight per pallet {fmt.kg(r0.weight_per_pallet)} → {fmt.kg(r1.weight_per_pallet)}")
+        if c1 is not None and c0 is not None and c0 != c1:
+            effects.append(f"cost {fmt.money(c0)} → {fmt.money(c1)}")
     if r1.winner and (not r0.winner or r0.winner.option != r1.winner.option):
-        changes.append(f"carrier → {r1.winner.option.carrier}")
+        effects.append(f"best carrier: {r1.winner.option.carrier}, {fmt.money(c1)}")
     # "Missing because not asked yet" is never news, before or (mid-conversation) after.
     old_issues = real_issues(before_ev.issues, before)
     new_all = after_ev.issues if complete else real_issues(after_ev.issues, after)
@@ -397,10 +422,16 @@ def change_summary(before: Booking, before_ev: Evaluation, after: Booking, after
     else:
         checks = ""
     if new_issues:
-        checks += (" — new: " if checks else "heads-up: ") + "; ".join(f"{i.rule_id} {i.title}" for i in new_issues)
+        checks += (" — new: " if checks else "heads-up: ") + "; ".join(i.title for i in new_issues)
     if fixed:
-        checks += (" — fixed: " if checks else "fixed: ") + ", ".join(sorted(fixed))
-    return "Updated: " + " · ".join(changes) + (" · " + checks if checks else "")
+        checks += (" — fixed: " if checks else "fixed: ") + ", ".join(TITLES_BY_RULE.get(r, r) for r in sorted(fixed))
+    tail = effects + ([checks] if checks else [])
+    lines = []
+    if changes:
+        lines.append("Updated: " + " · ".join(changes + tail))
+    if added:
+        lines.append("Got it: " + " · ".join(added + ([] if changes else tail)))
+    return "\n\n".join(lines)
 
 
 # ---- One turn --------------------------------------------------------------------
