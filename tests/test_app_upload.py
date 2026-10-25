@@ -24,7 +24,8 @@ def app(tmp_path, monkeypatch):
 
 def test_home_renders(app):
     assert not app.exception
-    assert app.title[0].value == "Shipment pre-flight checker"
+    labels = [b.label for b in app.button]
+    assert "Book by chat or voice" in labels and "See a 30-second demo" in labels
 
 
 def test_upload_sample_shows_every_booking(app):
@@ -40,3 +41,10 @@ def test_upload_sample_shows_every_booking(app):
         assert broken == expected, row["Booking"]
     metrics = {m.label: m.value for m in app.metric}
     assert metrics["Bookings"] == "14" and metrics["🟢 Ready to ship"] == "3"
+
+
+def test_home_demo_button_loads_sample(app):
+    next(b for b in app.button if b.label == "See a 30-second demo").click().run()
+    assert not app.exception
+    assert app.session_state["upload_name"] == "Sample file (planted mistakes)"
+    assert len(app.session_state["upload_bookings"]) == 14

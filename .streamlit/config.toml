@@ -1,0 +1,31 @@
+# ShipCheck brand: deep navy with a bold shipping-orange accent.
+[theme]
+base = "dark"
+primaryColor = "#F2690F"
+backgroundColor = "#0A1628"
+secondaryBackgroundColor = "#12243D"
+textColor = "#EAF0F7"
+borderColor = "#22406A"
+linkColor = "#FF9A4D"
+showWidgetBorder = true
+
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+headingFont = "'Plus Jakarta Sans':https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+headingFontWeights = [800, 700, 700, 600, 600, 600]
+baseRadius = "0.8rem"
+buttonRadius = "0.7rem"
+metricValueFontWeight = 700
+
+redColor = "#FF5A5F"
+orangeColor = "#FF9F43"
+greenColor = "#2ECC71"
+blueColor = "#4DA3FF"
+violetColor = "#A78BFA"
+grayColor = "#8DA2BE"
+
+dataframeBorderColor = "#22406A"
+dataframeHeaderBackgroundColor = "#12243D"
+chartCategoricalColors = ["#F2690F", "#4DA3FF", "#2ECC71", "#A78BFA", "#FF5A5F", "#FFC857", "#8DA2BE"]
+
+[server]
+maxUploadSize = 20

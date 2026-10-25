@@ -11,13 +11,14 @@ for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "GEMINI_API_KEY", "GOOGLE_A
     except Exception:  # no secrets file at all: fine, the app runs without the LLM
         pass
 
-st.set_page_config(page_title="Shipment pre-flight checker", page_icon=":material/local_shipping:",
+st.set_page_config(page_title="ShipCheck — shipment pre-flight checker", page_icon=":material/local_shipping:",
                    layout="wide")
+st.logo("assets/logo.svg", size="large")
 
 page = st.navigation([
     st.Page("app_pages/home.py", title="Home", icon=":material/home:", default=True),
     st.Page("app_pages/chat_booking.py", title="Book by chat", icon=":material/chat:"),
-    st.Page("app_pages/upload_file.py", title="Upload a file", icon=":material/upload_file:"),
-    st.Page("app_pages/trade_connect.py", title="Trade Connect", icon=":material/handshake:"),
+    st.Page("app_pages/upload_file.py", title="Check a file", icon=":material/fact_check:"),
+    st.Page("app_pages/trade_connect.py", title="Marketplace", icon=":material/storefront:"),
 ], position="top")
 page.run()

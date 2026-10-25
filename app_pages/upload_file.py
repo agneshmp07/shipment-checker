@@ -10,19 +10,28 @@ from core import fmt
 from core.check import evaluate
 from core.excel_loader import load_workbook
 from core.rules import TITLES
+from ui.brand import how_to, page_title
 from ui.results import carriers_or_warning, render_evaluation, render_issue
 
 SAMPLE = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "planted_mistakes.xlsx"
 
-st.title("Check a bookings file")
-st.write("Upload an Excel file with the **Bookings** sheet (one row per shipment) and the **Items** "
-         "sheet (one row per product). Every booking is checked against the 10-rule rulebook.")
+page_title("Check a bookings file", "Upload your Bookings and Items sheets and see every booking checked "
+           "against the 10 rules in seconds.")
+how_to("upload", [
+    ("Upload or try the sample", "Pick your .xlsx file (the case template, filled in from row 4), or tap "
+                                 "Try the sample file to see 14 bookings with planted mistakes."),
+    ("Read the dashboard", "See how many bookings are ready, need warnings checked, or are blocked, and "
+                           "the most common mistake."),
+    ("Open a booking and fix it", "Tap a row. Each problem shows the real numbers, why it matters and a "
+                                  "one-tap fix; the status updates instantly."),
+])
 carriers = carriers_or_warning()
 
 uploaded = st.file_uploader("Bookings file (.xlsx)", type=["xlsx"])
 with st.container(horizontal=True):
-    use_sample = st.button("Try the sample file", icon=":material/science:",
+    use_sample = st.button("Try the sample file", type="primary", icon=":material/science:",
                            help="14 bookings with planted mistakes, including 3 clean ones")
+    use_sample = use_sample or st.session_state.pop("load_sample", False)   # from the home page demo
     if SAMPLE.exists():
         st.download_button("Download the sample file", SAMPLE.read_bytes(), file_name="sample_bookings.xlsx",
                            icon=":material/download:")

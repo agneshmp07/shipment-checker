@@ -10,6 +10,7 @@ from core.chat_agent import (ChatState, Extraction, ItemPatch, handle_message, i
 from core.check import evaluate
 from core.models import DESTINATION_TYPES, ITEM_ORIGIN_COUNTRIES, ORIGIN_CITIES, PRIORITIES, DESTINATIONS
 from core.offline_parser import offline_extract
+from ui.brand import how_to, page_title
 from ui.results import carriers_or_warning, render_evaluation, status_badge
 
 GREETING = ("Hi! Tell me about your shipment in your own words — what you're sending, how many, and from "
@@ -23,7 +24,16 @@ if "chat" not in st.session_state:
 state: ChatState = st.session_state.chat
 today = date.today()
 
-st.title("Book by chat")
+page_title("Book by chat or voice", "Describe your shipment in your own words. I'll only ask for what's "
+           "missing, and the checks update every time you change something.")
+how_to("chat", [
+    ("Describe it", "Type or tap the mic and say what you're sending, how many, and from where to where. "
+                    "Or tap one of the examples below."),
+    ("Answer my questions", "I ask for at most 3 missing details at a time and check any numbers I "
+                            "calculate with you (“That's 90 cartons — correct?”)."),
+    ("Change anything", "Say “add a pallet” or “ready date 10-12-2026” at any time. When the booking is "
+                        "complete you see the full checks, carrier and confirmation below."),
+])
 carriers = carriers_or_warning()
 if st.session_state.ai_ok:
     st.caption(f":material/smart_toy: AI assistant: {llm.provider_label()} — it only reads your messages; "
@@ -68,6 +78,12 @@ chat_col, card_col = st.columns([3, 2], gap="large")
 with chat_col:
     history = st.container(height=520)
     prompt = st.chat_input("Describe your shipment, answer a question, or change something…")
+    prompt = prompt or st.session_state.pop("chat_prefill", None)      # example tapped on Home
+    if len(state.messages) == 1 and not prompt:
+        st.pills("Or tap an example", key="chat_example", on_change=lambda: st.session_state.update(
+            chat_prefill=st.session_state.chat_example),
+            options=["I'm sending 1080 mugs from Manchester to a warehouse in Frankfurt",
+                     "500 cotton t-shirts from London to a shop in Paris, as fast as possible"])
     if prompt:
         send(prompt)
     with history:

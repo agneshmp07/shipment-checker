@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 48" role="img" aria-label="ShipCheck">
+  <rect x="2" y="6" width="36" height="36" rx="10" fill="#F2690F"/>
+  <path d="M10 18h13a2 2 0 0 1 2 2v12H10z" fill="#fff"/>
+  <path d="M25 22h4.5l3.5 5v5h-8z" fill="#fff"/>
+  <circle cx="15" cy="33.5" r="3" fill="#0A1628" stroke="#fff" stroke-width="1.6"/>
+  <circle cx="29" cy="33.5" r="3" fill="#0A1628" stroke="#fff" stroke-width="1.6"/>
+  <path d="M13.5 25l2.5 2.5 5-5" fill="none" stroke="#F2690F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="48" y="32" font-family="Plus Jakarta Sans, Inter, Arial, sans-serif" font-size="22" font-weight="800" fill="#EAF0F7">Ship<tspan fill="#FF8A3D">Check</tspan></text>
+</svg>
