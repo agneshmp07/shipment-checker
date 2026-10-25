@@ -158,8 +158,7 @@ def offline_answer(question: str, focus: Optional[Evaluation], chat: Optional[Ev
             lines.append(f"- {r.title} ({r.confidence} confidence) — fixes {len(r.fixes)} issue(s).")
         for i in rest:
             lines.append(f"- {i.severity} {i.rule_id} {i.title}: {i.explanation} **Fix:** {i.fix}")
-        lines.append("
-Tap the fix buttons under each issue to apply a fix and re-check instantly.")
+        lines.append("\nTap the fix buttons under each issue to apply a fix and re-check instantly.")
         return "\n".join(lines)
     if re.search(r"carrier|cheapest|fastest|cost|price|delivery date|arrive", q) and (focus or chat):
         ev = focus or chat
