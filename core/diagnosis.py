@@ -377,3 +377,40 @@ def apply_fix(b: Booking, action: dict) -> str:
     if f in ("total_gross_weight_kg", "unit_weight_kg"):
         show = lambda v: fmt.kg(v)
     return f"{names.get(f, f.replace('_', ' '))}{where}: {show(old) if old is not None else '—'} → {show(value)}"
+
+
+# ---- Fix all ---------------------------------------------------------------------------
+
+
+def high_confidence_actions(b: Booking, issues: list[Issue]) -> list[tuple[RootCause, dict]]:
+    """Fixes safe to apply without asking: High-confidence root causes only.
+
+    Totals (declared value, carton total, gross weight) are diagnosed as if the item fixes
+    were already made, so a High total fix is only safe when every item fix in the booking
+    is High too (and therefore applied alongside it)."""
+    roots, _ = diagnose(b, issues)
+    item_roots = [r for r in roots if r.fix_action and r.fix_action["target"] == "item"
+                  and r.fix_action["field"] in ("cartons", "quantity", "units_per_carton")]
+    items_all_high = all(r.confidence == "High" for r in item_roots)
+    out = []
+    for r in roots:
+        if r.confidence != "High" or not r.fix_action:
+            continue
+        if r not in item_roots and item_roots and not items_all_high:
+            continue
+        out.append((r, r.fix_action))
+    return out
+
+
+def fix_all(bookings: list[Booking], evaluate_fn) -> dict[str, list[str]]:
+    """Apply every high-confidence fix, re-checking after each round (a fix can reveal the next).
+    Returns {booking_id: ["cartons for MUG-01: 80 → 90", ...]} for bookings that changed."""
+    changes: dict[str, list[str]] = {}
+    for b in bookings:
+        for _ in range(3):
+            actions = high_confidence_actions(b, evaluate_fn(b).issues)
+            if not actions:
+                break
+            for _, action in actions:
+                changes.setdefault(b.booking_id or "?", []).append(apply_fix(b, action))
+    return changes
