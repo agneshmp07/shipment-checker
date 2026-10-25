@@ -57,19 +57,21 @@ Run the tests (no API key or network needed):
 python -m pytest
 ```
 
-## ⚠️ Before deploying: load the carrier rate card
+## Carrier rate card
 
-`data/carriers.json` must be built from **Sheet 3 (Carrier options)** of the case template. It
-is not committed with made-up values — without it the app still runs, but shows a warning, cannot
-recommend a carrier, and the pallet-weight check (R-05) cannot run.
+`data/carriers.json` holds the 9 carrier options from **Sheet 3 (Carrier options)** of the case
+template, copied exactly (Carriers A, B and C to Germany, France and the Netherlands). If the rate
+card ever changes, put the template in this folder and rebuild it:
 
 ```bash
 python -m scripts.build_carriers Case2_Shipment_Booking_Test_Data_Format.xlsx
 ```
 
-The script prints every carrier row it read so you can check it against the sheet, and refuses
-to write the file if any row is incomplete. Then run the tests again (they automatically use the
-real rate card once it exists).
+The script prints every row it read and refuses to write the file if any row is incomplete.
+
+**Template example row:** row 3 of the template's Bookings and Items sheets is a grey example
+(BK-001 / MUG-01). If an uploaded file still contains it unchanged it is skipped and a note says
+so; if row 3 has been typed over with real data, it is checked like any other row.
 
 ## Deploy (public link, no login)
 
@@ -122,7 +124,8 @@ tests/                     pytest suite; tests/fixtures/planted_mistakes.xlsx (+
 
 ## Sample file with planted mistakes
 
-`tests/fixtures/planted_mistakes.xlsx` has 14 bookings: 3 clean, each rule broken at least once,
+`tests/fixtures/planted_mistakes.xlsx` is the case template filled in from row 4 (example row and
+all fixed sheets kept) with 14 bookings: 3 clean, each rule broken at least once,
 one booking with seven mistakes, one with a junk value, plus an item row for a booking that doesn't
 exist. Regenerate it with `python -m tests.fixtures.make_planted_mistakes`; the answer key is in
 that script and `tests/test_planted_mistakes.py` checks every booking is flagged with exactly the

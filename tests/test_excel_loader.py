@@ -13,9 +13,9 @@ BOOKING_HEADERS = ["Booking ID", "Seller name", "Origin city", "Origin country",
 ITEM_HEADERS = ["Booking ID", "SKU", "Description", "HS code", "Quantity (units)", "Unit price",
                 "Units per carton", "Cartons", "Unit weight (kg)", "Country of origin"]
 
-GOOD_BOOKING = ["BK-001", "Northfield Goods", "Manchester", "United Kingdom", "Frankfurt", "Germany",
+GOOD_BOOKING = ["BK-010", "Northfield Goods", "Manchester", "United Kingdom", "Frankfurt", "Germany",
                 "Warehouse", "05-11-2026", "Cheapest", 3, 90, 5400, "GBP", 620, "Yes"]
-GOOD_ITEM = ["BK-001", "MUG-01", "Ceramic coffee mug, 350 ml", 691200, 1080, 5.00, 12, 90, 0.5,
+GOOD_ITEM = ["BK-010", "MUG-01", "Ceramic coffee mug, 350 ml", 691200, 1080, 5.00, 12, 90, 0.5,
              "United Kingdom"]
 
 
@@ -109,3 +109,46 @@ def test_blank_hs_and_country_are_left_for_rules(tmp_path):
 def test_not_an_excel_file():
     res = load_workbook(b"this is not a workbook")
     assert res.bookings == [] and res.file_issues[0].title == "File could not be opened"
+
+
+# ---- The real case template (skipped if it isn't in the project folder) ----------------
+from pathlib import Path
+
+TEMPLATE = Path(__file__).resolve().parent.parent / "Case2_Shipment_Booking_Test_Data_Format.xlsx"
+needs_template = pytest.mark.skipif(not TEMPLATE.exists(), reason="case template not present")
+
+
+@needs_template
+def test_template_alone_has_only_the_example_row():
+    res = load_workbook(TEMPLATE)
+    assert res.bookings == []
+    assert any("Skipped Bookings row 3" in n for n in res.notes)
+    assert [i.title for i in res.file_issues] == ["Only the example row was found"]
+
+
+@needs_template
+def test_template_with_data_from_row_4_skips_example(tmp_path):
+    wb = openpyxl.load_workbook(TEMPLATE)
+    row = GOOD_BOOKING.copy()
+    row[0] = "BK-777"
+    item = GOOD_ITEM.copy()
+    item[0] = "BK-777"
+    for c, v in enumerate(row, 1):
+        wb["Bookings"].cell(4, c, v)
+    for c, v in enumerate(item, 1):
+        wb["Items"].cell(4, c, v)
+    p = tmp_path / "judges.xlsx"
+    wb.save(p)
+    res = load_workbook(p)
+    assert [b.booking_id for b in res.bookings] == ["BK-777"] and res.file_issues == []
+    assert len(res.notes) == 2 and res.bookings[0].items[0].sku == "MUG-01"
+
+
+@needs_template
+def test_row_3_overwritten_with_real_data_is_kept(tmp_path):
+    wb = openpyxl.load_workbook(TEMPLATE)
+    wb["Bookings"].cell(3, 12, 9999)          # declared value changed -> no longer the example
+    p = tmp_path / "judges.xlsx"
+    wb.save(p)
+    res = load_workbook(p)
+    assert [b.booking_id for b in res.bookings] == ["BK-001"] and res.notes == []

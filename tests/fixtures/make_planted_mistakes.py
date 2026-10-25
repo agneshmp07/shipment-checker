@@ -9,6 +9,9 @@ from pathlib import Path
 import openpyxl
 
 OUT = Path(__file__).with_name("planted_mistakes.xlsx")
+# When the case template is present, the fixture is written INTO it (keeping the grey
+# example row 3 and Sheets 3-6), exactly as judges will fill it in from row 4.
+TEMPLATE = Path(__file__).resolve().parents[2] / "Case2_Shipment_Booking_Test_Data_Format.xlsx"
 
 BOOKING_HEADERS = ["Booking ID", "Seller name", "Origin city", "Origin country", "Destination city",
                    "Destination country", "Destination type", "Ready to ship date", "Seller priority",
@@ -77,18 +80,35 @@ EXPECTED = {
 CLEAN = {"BK-101", "BK-102", "BK-103"}
 
 
+def _rows():
+    bookings = []
+    for bk in BOOKINGS:
+        bid, seller, oc, dc, dco, typ, ready, prio, pal, ctn, val, gross, appt = bk
+        bookings.append([bid, seller, oc, UK, dc, dco, typ, ready, prio, pal, ctn, val, "GBP", gross, appt])
+    return bookings, [list(it) for it in ITEMS]
+
+
 def build(path: Path = OUT) -> Path:
+    bookings, items = _rows()
+    if TEMPLATE.exists():
+        wb = openpyxl.load_workbook(TEMPLATE)
+        for sheet, rows in (("Bookings", bookings), ("Items", items)):
+            ws = wb[sheet]
+            for r, row in enumerate(rows, start=4):          # data starts at row 4
+                for c, value in enumerate(row, start=1):
+                    ws.cell(r, c, value)
+        wb.save(path)
+        return path
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Bookings"
     ws.append(BOOKING_HEADERS)
-    for b in BOOKINGS:
-        bid, seller, oc, dc, dco, typ, ready, prio, pal, ctn, val, gross, appt = b
-        ws.append([bid, seller, oc, UK, dc, dco, typ, ready, prio, pal, ctn, val, "GBP", gross, appt])
+    for row in bookings:
+        ws.append(row)
     wi = wb.create_sheet("Items")
     wi.append(ITEM_HEADERS)
-    for it in ITEMS:
-        wi.append(list(it))
+    for row in items:
+        wi.append(row)
     wb.save(path)
     return path
 

@@ -31,11 +31,13 @@ with st.container(horizontal=True):
 if uploaded is not None and st.session_state.get("upload_source") != uploaded.file_id:
     res = load_workbook(uploaded.getvalue())
     st.session_state.update(upload_source=uploaded.file_id, upload_name=uploaded.name,
-                            upload_bookings=res.bookings, upload_file_issues=res.file_issues)
+                            upload_bookings=res.bookings, upload_file_issues=res.file_issues,
+                            upload_notes=res.notes)
 elif use_sample:
     res = load_workbook(SAMPLE)
     st.session_state.update(upload_source="sample", upload_name="Sample file (planted mistakes)",
-                            upload_bookings=res.bookings, upload_file_issues=res.file_issues)
+                            upload_bookings=res.bookings, upload_file_issues=res.file_issues,
+                            upload_notes=res.notes)
 
 bookings = st.session_state.get("upload_bookings")
 file_issues = st.session_state.get("upload_file_issues", [])
@@ -49,6 +51,8 @@ if file_issues:
                      expanded=not bookings):
         for n, issue in enumerate(file_issues):
             render_issue(issue, f"file-{n}")
+for note in st.session_state.get("upload_notes", []):
+    st.caption(f":material/info: {note}")
 if not bookings:
     st.stop()
 

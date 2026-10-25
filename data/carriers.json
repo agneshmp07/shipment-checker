@@ -1,0 +1,92 @@
+[
+  {
+    "carrier": "Carrier A",
+    "service": "Road economy",
+    "origin_country": "United Kingdom",
+    "destination_country": "Germany",
+    "price_per_pallet": 180.0,
+    "transit_days": 5.0,
+    "on_time_rate": 92.0,
+    "max_weight_per_pallet_kg": 500.0
+  },
+  {
+    "carrier": "Carrier B",
+    "service": "Road standard",
+    "origin_country": "United Kingdom",
+    "destination_country": "Germany",
+    "price_per_pallet": 220.0,
+    "transit_days": 3.0,
+    "on_time_rate": 95.0,
+    "max_weight_per_pallet_kg": 750.0
+  },
+  {
+    "carrier": "Carrier C",
+    "service": "Road express",
+    "origin_country": "United Kingdom",
+    "destination_country": "Germany",
+    "price_per_pallet": 340.0,
+    "transit_days": 2.0,
+    "on_time_rate": 98.0,
+    "max_weight_per_pallet_kg": 400.0
+  },
+  {
+    "carrier": "Carrier A",
+    "service": "Road economy",
+    "origin_country": "United Kingdom",
+    "destination_country": "France",
+    "price_per_pallet": 170.0,
+    "transit_days": 5.0,
+    "on_time_rate": 92.0,
+    "max_weight_per_pallet_kg": 500.0
+  },
+  {
+    "carrier": "Carrier B",
+    "service": "Road standard",
+    "origin_country": "United Kingdom",
+    "destination_country": "France",
+    "price_per_pallet": 210.0,
+    "transit_days": 3.0,
+    "on_time_rate": 95.0,
+    "max_weight_per_pallet_kg": 750.0
+  },
+  {
+    "carrier": "Carrier C",
+    "service": "Road express",
+    "origin_country": "United Kingdom",
+    "destination_country": "France",
+    "price_per_pallet": 330.0,
+    "transit_days": 2.0,
+    "on_time_rate": 98.0,
+    "max_weight_per_pallet_kg": 400.0
+  },
+  {
+    "carrier": "Carrier A",
+    "service": "Road economy",
+    "origin_country": "United Kingdom",
+    "destination_country": "Netherlands",
+    "price_per_pallet": 160.0,
+    "transit_days": 5.0,
+    "on_time_rate": 92.0,
+    "max_weight_per_pallet_kg": 500.0
+  },
+  {
+    "carrier": "Carrier B",
+    "service": "Road standard",
+    "origin_country": "United Kingdom",
+    "destination_country": "Netherlands",
+    "price_per_pallet": 200.0,
+    "transit_days": 3.0,
+    "on_time_rate": 95.0,
+    "max_weight_per_pallet_kg": 750.0
+  },
+  {
+    "carrier": "Carrier C",
+    "service": "Road express",
+    "origin_country": "United Kingdom",
+    "destination_country": "Netherlands",
+    "price_per_pallet": 320.0,
+    "transit_days": 2.0,
+    "on_time_rate": 98.0,
+    "max_weight_per_pallet_kg": 400.0
+  }
+]

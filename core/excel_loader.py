@@ -362,6 +362,22 @@ def build_item(row_no: int, rec: dict) -> tuple[Item, list[Issue]]:
 class LoadResult:
     bookings: list[Booking] = field(default_factory=list)
     file_issues: list[Issue] = field(default_factory=list)   # not tied to one booking
+    notes: list[str] = field(default_factory=list)            # informational, not problems
+
+
+# The template's grey example rows (row 3 of Bookings and Items). Skipped only when a
+# row matches them exactly, so real data typed over row 3 is still checked.
+EXAMPLE_BOOKING = dict(booking_id="BK-001", seller_name="Northfield Goods", origin_city="Manchester",
+                       destination_city="Frankfurt", destination_type="Warehouse",
+                       ready_date=date(2026, 11, 5), seller_priority="Cheapest", pallets=3, cartons=90,
+                       total_declared_value=5400, total_gross_weight_kg=620, delivery_appointment_booked=True)
+EXAMPLE_ITEM = dict(booking_id="BK-001", sku="MUG-01", description="Ceramic coffee mug, 350 ml",
+                    hs_code="691200", quantity=1080, unit_price=5, units_per_carton=12, cartons=90,
+                    unit_weight_kg=0.5, country_of_origin="United Kingdom")
+
+
+def _matches(obj, example: dict) -> bool:
+    return all(getattr(obj, k) == v for k, v in example.items())
 
 
 def load_workbook(source) -> LoadResult:
@@ -394,8 +410,13 @@ def load_workbook(source) -> LoadResult:
                                                  "Check the column names match the template."))
 
     by_id: dict[str, Booking] = {}
+    skipped_example = False
     for row_no, rec in b_rows:
         b = build_booking(row_no, rec)
+        if _matches(b, EXAMPLE_BOOKING):
+            skipped_example = True
+            result.notes.append(f"Skipped Bookings row {row_no}: it is the template's grey example row (BK-001).")
+            continue
         if b.booking_id and b.booking_id in by_id:
             result.file_issues.append(data_issue(
                 "Red", f"Duplicate Booking ID {b.booking_id}",
@@ -409,6 +430,9 @@ def load_workbook(source) -> LoadResult:
 
     for row_no, rec in i_rows:
         item, issues = build_item(row_no, rec)
+        if skipped_example and "BK-001" not in by_id and _matches(item, EXAMPLE_ITEM):
+            result.notes.append(f"Skipped Items row {row_no}: it is the template's grey example row (MUG-01).")
+            continue
         owner = by_id.get(item.booking_id or "")
         if owner is None:
             result.file_issues.append(data_issue(
@@ -420,6 +444,10 @@ def load_workbook(source) -> LoadResult:
         owner.items.append(item)
         owner.data_issues.extend(issues)
 
+    if not result.bookings and skipped_example:
+        result.file_issues.append(data_issue("Red", "Only the example row was found",
+                                             "The Bookings sheet contains only the template's grey example row (BK-001).",
+                                             "Enter your bookings from row 4 of the Bookings sheet."))
     for b in result.bookings:
         if not b.items:
             b.data_issues.append(data_issue("Red", "Booking has no items",
