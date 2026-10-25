@@ -14,6 +14,7 @@ from core.diagnosis import apply_fix, diagnose
 from core.confirmation import DELIVERY_ASSUMPTION
 from core.report import html_report
 from core.rules import RULE_NAMES
+from core.trade_connect import load_directory, match_buyers
 
 STATUS_STYLE = {  # status -> (badge colour, icon)
     "Blocked": ("red", ":material/block:"),
@@ -174,6 +175,17 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
     st.markdown("#### :material/timeline: What happens next")
     for n, s in enumerate(ev.next_steps, 1):
         st.markdown(f"{STEP_ICON[s['state']]} **{n}. {s['step']}** — {s['detail']}")
+
+    matches = match_buyers(b, load_directory())[:2]
+    if matches:
+        st.markdown("#### :material/storefront: Buyers for these goods")
+        for m in matches:
+            st.markdown(f"**{m.business.name}** — {' · '.join(m.reasons)}")
+        try:
+            st.page_link("app_pages/trade_connect.py", label="See all matches and message buyers in the Marketplace",
+                         icon=":material/arrow_forward:")
+        except Exception:      # rendered outside the multipage app (e.g. a test harness)
+            st.caption("See all matches and message buyers in the Marketplace.")
 
     st.download_button("Download booking report (HTML)", html_report(ev),
                        file_name=f"booking_{b.booking_id or 'new'}.html", mime="text/html",

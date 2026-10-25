@@ -72,3 +72,59 @@ def test_page_renders_with_badges_after_upload(tmp_path, monkeypatch):
     text = " ".join(m.value for m in at.markdown)
     assert "**Thread & Co** :green-badge[Pre-checked shipper ✅]" in text
     assert "**Northfield Goods** :green-badge" not in text
+
+
+# ---- Marketplace: matching, listings, inbox --------------------------------------------------
+from core.trade_connect import Business, categories_for, demo_reply, match_buyers
+from tests.test_rules import booking, item
+
+
+@pytest.mark.parametrize("desc,cats", [("Ceramic coffee mug, 350 ml", {"Ceramics", "Homeware", "Kitchen"}),
+                                       ("Cotton t-shirt, crew neck", {"Apparel", "Textiles"}),
+                                       ("A5 lined notebook", {"Stationery", "Gifts"}),
+                                       ("Mystery widget", set())])
+def test_categories_for(desc, cats):
+    assert set(categories_for(desc)) == cats
+
+
+def test_match_buyers_prefers_destination_city():
+    matches = match_buyers(booking(), load_directory())          # mugs -> Frankfurt
+    assert matches[0].business.name == "Haus & Herd GmbH"
+    assert "destination city" in matches[0].reasons[0]
+    assert all(m.business.role == "Buyer" for m in matches)
+    assert match_buyers(booking([item(description="Mystery widget")]), load_directory()) == []
+
+
+def test_user_listing_can_be_matched():
+    mine = Business(name="Lyon Mugs Buyer", country="France", city="Lyon", role="Buyer",
+                    categories=["Ceramics"], about="Buys mugs")
+    b = booking(destination_city="Lyon", destination_country="France")
+    assert match_buyers(b, load_directory() + [mine])[0].business.name == "Lyon Mugs Buyer"
+
+
+def test_demo_reply_mentions_city():
+    biz = next(b for b in load_directory() if b.name == "Haus & Herd GmbH")
+    assert "Frankfurt" in demo_reply(biz, "hello")
+
+
+def test_marketplace_tabs_with_bookings(tmp_path, monkeypatch):
+    path = tmp_path / "carriers.json"
+    path.write_text(json.dumps([c.model_dump() for c in STANDIN_CARRIERS]))
+    monkeypatch.setenv("SHIPMENT_CARRIERS_PATH", str(path))
+    build()
+    at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=30)
+    at.run()
+    at.switch_page("app_pages/trade_connect.py").run()
+    at.session_state["upload_bookings"] = load_workbook(OUT).bookings
+    at.run()
+    assert not at.exception
+    assert len(at.tabs) == 4
+    text = " ".join(m.value for m in at.markdown)
+    assert "buyer(s)** for" in text                              # matches tab rendered
+    # Post a listing -> it appears, and a matching buyer writes to the inbox
+    form_inputs = [t for t in at.text_input if t.label == "City"]
+    form_inputs[0].set_value("Manchester")
+    next(b for b in at.button if b.label == "Publish listing").click().run()
+    assert not at.exception
+    assert len(at.session_state["my_listings"]) == 1
+    assert len(at.session_state["threads"]) == 1
