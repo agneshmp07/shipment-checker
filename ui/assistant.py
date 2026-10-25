@@ -6,7 +6,7 @@ from datetime import date
 import streamlit as st
 
 from core import assistant, llm
-from core.chat_agent import ChatState
+from core.chat_agent import LABELS, ChatState, missing_fields
 from core.check import evaluate
 from ui.results import get_carriers
 from ui.voice import say, transcribe
@@ -27,14 +27,15 @@ def _gather():
     uploads = [evaluate(b, carriers, today) for b in st.session_state.get("upload_bookings") or []]
     if focus is not None:   # re-evaluate so it reflects any fix applied since it was shown
         focus = evaluate(focus.booking, carriers, today)
-    return focus, chat_ev, uploads
+    chat_missing = [LABELS[f] for _, f, _ in missing_fields(chat)] if chat_ev is not None else []
+    return focus, chat_ev, uploads, chat_missing
 
 
 def ask(question: str, page: str):
     history = st.session_state.setdefault("ai_history", [])
-    focus, chat_ev, uploads = _gather()
+    focus, chat_ev, uploads, chat_missing = _gather()
     with st.spinner("Thinking…"):
-        reply, source = assistant.answer(question, history, page, focus, chat_ev, uploads)
+        reply, source = assistant.answer(question, history, page, focus, chat_ev, uploads, chat_missing)
     history += [{"role": "user", "content": question}, {"role": "assistant", "content": reply, "source": source}]
 
 

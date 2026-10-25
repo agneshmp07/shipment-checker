@@ -82,3 +82,8 @@ def test_ask_ai_on_a_page(tmp_path, monkeypatch):
     next(b for b in at.button if b.label == "Ask").click().run()
     assert not at.exception
     assert at.session_state["ai_history"][-1]["content"].startswith("An **HS code**")
+
+
+def test_context_marks_unfinished_chat_booking(evals):
+    ctx = assistant.build_context("Book by chat", None, evals["BK-101"], [], ["how many pallets"])
+    assert "not finished yet" in ctx and "how many pallets" in ctx

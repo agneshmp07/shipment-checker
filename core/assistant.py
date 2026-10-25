@@ -86,8 +86,11 @@ def describe(ev: Evaluation, detailed: bool = True) -> str:
 
 
 def build_context(page: str, focus: Optional[Evaluation], chat: Optional[Evaluation],
-                  uploads: list[Evaluation]) -> str:
+                  uploads: list[Evaluation], chat_missing: Optional[list[str]] = None) -> str:
     parts = [f"The user is on the {page} page."]
+    if chat is not None and chat_missing:
+        parts.append("The chat booking is still being filled in, so its status is provisional: say it is "
+                     "'not finished yet' rather than 'blocked'. Still needed: " + ", ".join(chat_missing) + ".")
     if focus is not None:
         parts.append("Booking the user is looking at:\n" + describe(focus))
     if chat is not None and (focus is None or chat.booking is not focus.booking):
@@ -181,10 +184,11 @@ def offline_answer(question: str, focus: Optional[Evaluation], chat: Optional[Ev
 
 
 def answer(question: str, history: list[dict], page: str, focus: Optional[Evaluation],
-           chat: Optional[Evaluation], uploads: list[Evaluation]) -> tuple[str, str]:
+           chat: Optional[Evaluation], uploads: list[Evaluation],
+           chat_missing: Optional[list[str]] = None) -> tuple[str, str]:
     """Return (answer, source) where source is 'ai' or 'built-in'."""
     if llm.available():
-        context = build_context(page, focus, chat, uploads)
+        context = build_context(page, focus, chat, uploads, chat_missing)
         msgs = history[-6:] + [{"role": "user", "content": f"Current results:\n{context}\n\nQuestion: {question}"}]
         try:
             return llm.llm_text(SYSTEM, msgs), "ai"
