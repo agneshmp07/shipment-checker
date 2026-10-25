@@ -3,11 +3,12 @@ import streamlit as st
 from ui.brand import hero, steps
 
 hero(
-    kicker="UK → Germany · France · Netherlands",
+    kicker="Pre-flight check · UK → Germany · France · Netherlands",
     title_html="Ship to Europe <span>without surprises</span>",
-    subtitle="Tell us about your shipment by chat, voice or Excel. We check it against 10 customs and "
-             "warehouse rules, show you exactly how to fix any mistake, and pick the best carrier.",
-    chips=["10 checks in seconds", "Plain-English fixes", "Best of 3 carriers", "Voice + AI assistant"],
+    subtitle="Book your shipment by chat, voice or Excel. Before it leaves, we run a pre-flight check against "
+             "10 customs and warehouse rules — so your goods aren't held at customs or reported missing at "
+             "the warehouse — show you exactly how to fix any mistake, and pick the best carrier.",
+    chips=["Pre-flight check in seconds", "Plain-English fixes", "Best of 3 carriers", "Voice + AI assistant"],
 )
 
 with st.container(horizontal=True):
@@ -66,6 +67,18 @@ for n, (icon, title, text, page, link) in enumerate(cards):
             st.page_link(page, label=link, icon=":material/arrow_forward:")
         else:
             st.caption("Look for the **Ask AI** button at the top of every page.")
+
+st.markdown("#### Key terms")
+st.table({
+    "Commercial invoice": "The document listing what's in the shipment, how many and what it's worth. Customs "
+                          "relies on it — ShipCheck drafts it for you.",
+    "HS code": "The international code that classifies each product for customs (at least 6 digits).",
+    "Declared value": "The total value of the goods as stated on the paperwork.",
+    "Carton / pallet": "A carton is a box of units; a pallet is the platform holding many cartons.",
+    "Customs hold": "When customs stops a shipment until a problem with its paperwork is fixed.",
+    "Delivery appointment": "A booked time slot at the receiving warehouse.",
+    "Transit time": "How many days the shipment takes to arrive once collected.",
+}, border="horizontal")
 
 with st.expander("What we check (the 10 rules)", icon=":material/rule:"):
     st.markdown(
