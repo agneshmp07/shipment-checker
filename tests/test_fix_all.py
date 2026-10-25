@@ -86,7 +86,7 @@ def test_upload_page_fix_all_button(tmp_path, monkeypatch):
     upload_file(at, OUT)
     next(b for b in at.button if b.label == "Fix all high-confidence mistakes").click().run()
     assert not at.exception
-    assert any(s.value.startswith("Fixed 3 mistakes in 3 bookings") for s in at.success)
+    assert any("Fix all corrected 3 mistakes" in c.value for c in at.caption)
     assert any(b.label == "Undo all fixes" for b in at.button)
     next(b for b in at.button if b.label == "Undo all fixes").click().run()
     assert not any(b.label == "Undo all fixes" for b in at.button)

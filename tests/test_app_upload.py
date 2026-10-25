@@ -35,12 +35,15 @@ def test_upload_sample_shows_every_booking(app):
     assert not app.exception
     table = app.dataframe[0].value
     assert set(table["Booking"]) == set(EXPECTED)
+    red_rules = {"R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "DATA"}
     for _, row in table.iterrows():
-        broken = set() if row["Rules broken"] == "—" else set(row["Rules broken"].split(", "))
-        expected = {"Input" if r == "DATA" else r for r in EXPECTED[row["Booking"]]}
-        assert broken == expected, row["Booking"]
-    metrics = {m.label: m.value for m in app.metric}
-    assert metrics["Bookings"] == "14" and metrics["🟢 Ready to ship"] == "3"
+        rules = EXPECTED[row["Booking"]]
+        want = "Ready to ship" if not rules else "Blocked" if rules & red_rules else "Ready with warnings"
+        assert row["Status"].endswith(want), row["Booking"]
+    assert list(table.columns) == ["Booking", "Status", "Route", "Seller", "Best carrier"]
+    metrics = {m.label.split(": ")[-1].split(":")[-1].strip(): m.value for m in app.metric}
+    tiles = {k: v for k, v in metrics.items() if k in ("Can't ship yet", "Warnings", "Ready to ship")}
+    assert tiles == {"Can't ship yet": "9", "Warnings": "2", "Ready to ship": "3"}
 
 
 def test_no_sample_shortcuts_on_upload_page(app):

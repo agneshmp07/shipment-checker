@@ -89,103 +89,108 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
     # "Ask AI" talks about the booking on screen (remembered per page)
     st.session_state.assistant_focus = (st.session_state.get("current_page"), ev)
 
-    # Header
-    with st.container(border=True):
-        status_banner(ev)
-        with st.container(horizontal=True):
-            st.metric("Pallets", fmt.num(b.pallets), border=True)
-            st.metric("Cartons", fmt.num(b.cartons), border=True)
-            st.metric("Declared value", fmt.money(b.total_declared_value), border=True)
-            st.metric("Gross weight", fmt.kg(b.total_gross_weight_kg), border=True)
-            st.metric("Weight per pallet", fmt.kg(rec.weight_per_pallet), border=True)
-        with st.expander(f"Items ({len(b.items)})"):
-            st.dataframe(pd.DataFrame([{
-                "SKU": it.sku, "Description": it.description, "HS code": it.hs_code,
-                "Quantity": it.quantity, "Unit price (£)": it.unit_price,
-                "Units/carton": it.units_per_carton, "Cartons": it.cartons,
-                "Unit weight (kg)": it.unit_weight_kg, "Country of origin": it.country_of_origin,
-            } for it in b.items]), hide_index=True)
+    # Header: status in plain words and the four numbers people check first
+    status_banner(ev)
+    with st.container(horizontal=True):
+        st.metric("Pallets", fmt.num(b.pallets), border=True)
+        st.metric("Cartons", fmt.num(b.cartons), border=True)
+        st.metric("Declared value", fmt.money(b.total_declared_value), border=True)
+        st.metric("Weight per pallet", fmt.kg(rec.weight_per_pallet), border=True)
+    with st.expander(f"Items ({len(b.items)}) · gross weight {fmt.kg(b.total_gross_weight_kg)}",
+                     icon=":material/inventory_2:"):
+        st.dataframe(pd.DataFrame([{
+            "SKU": it.sku, "Description": it.description, "HS code": it.hs_code,
+            "Quantity": it.quantity, "Unit price (£)": it.unit_price,
+            "Units/carton": it.units_per_carton, "Cartons": it.cartons,
+            "Unit weight (kg)": it.unit_weight_kg, "Country of origin": it.country_of_origin,
+        } for it in b.items]), hide_index=True)
 
-    # Checks
-    st.markdown("#### :material/fact_check: Checks")
-    failed = {i.rule_id for i in ev.issues}
-    passed = [r for r in RULE_NAMES if r not in failed]
-    msg = st.session_state.pop(f"fixmsg-{key}", None)
-    if msg:
-        st.success(msg, icon=":material/build:")
-    if not ev.issues:
-        st.success("All 10 rulebook checks pass.", icon=":material/check_circle:")
-    roots, remaining = diagnose(b, ev.issues)
-    by_key = {f"{i.rule_id}:{i.item_sku or ''}": i for i in ev.issues}
-    for n, rc in enumerate(roots):
-        with st.container(border=True):
-            n_fix = len(rc.fixes)
-            head = f"1 root problem → fixes {n_fix} issues" if n_fix > 1 else "Likely cause"
-            st.markdown(f":violet-badge[{head}] :{CONFIDENCE_COLOUR[rc.confidence]}-badge[{rc.confidence} "
-                        f"confidence] **{rc.title}**")
-            st.write(rc.explanation)
-            explained = [by_key[k] for k in rc.fixes if k in by_key]
-            st.caption("Explains: " + " · ".join(i.title for i in explained))
-            with st.expander("Show the details of these issues"):
-                for m, issue in enumerate(explained):
-                    render_issue(issue, f"{key}-root{n}-{m}")
-            fix_button(ev, rc.fix_action, rc.fix_label, f"{key}-root-{n}-btn", key, on_fix)
-    if roots and remaining:
-        st.markdown("**Other issues**")
-    for n, issue in enumerate(remaining):
-        render_issue(issue, f"{key}-issue-{n}", ev, on_fix, msg_key=key)
-    if llm.available():
-        flagged = {i.item_sku for i in ev.issues if i.rule_id == "R-06"}
-        unflagged = tuple((it.sku, it.description) for it in b.items
-                          if it.sku and it.description and it.sku not in flagged)
-        for h in dg_hints(unflagged):
-            st.warning(f"**Possible dangerous goods — please confirm:** {h['sku']} — {h['reason']}. "
-                       "This is an AI suggestion only; it does not change the status.",
-                       icon=":material/help:")
-    if ev.issues and passed:
-        with st.expander(f"See the {len(passed)} checks that passed", icon=":material/check_circle:"):
-            st.markdown(" · ".join(f"✅ {RULE_NAMES[r]}" for r in passed))
+    t_problems, t_carrier, t_confirm, t_invoice, t_buyers = st.tabs(
+        [":material/build: Problems & fixes", ":material/local_shipping: Carrier",
+         ":material/assignment_turned_in: Confirmation", ":material/receipt_long: Invoice",
+         ":material/storefront: Buyers"], key=f"{key}-tabs", on_change="rerun")
 
-    # Carrier
-    st.markdown("#### :material/local_shipping: Recommended carrier")
-    if rec.winner:
-        carrier_cards(rec)
-        st.write(rec.reason)
-        if rec.trade_off:
-            st.caption(f"Trade-off: {rec.trade_off}")
-    else:
-        st.error(rec.reason, icon=":material/local_shipping:")
-    if rec.all_options:
-        with st.expander("Compare all carriers on this route"):
-            st.dataframe(pd.DataFrame([{
-                "Status": r.status, "Carrier": label(r.option), "Total cost (£)": r.total_cost,
-                "Transit (days)": r.option.transit_days, "On time (%)": r.option.on_time_rate,
-                "Max per pallet (kg)": r.option.max_weight_per_pallet_kg, "Notes": r.reason,
-            } for r in rec.all_options]), hide_index=True,
-                column_config={"Total cost (£)": st.column_config.NumberColumn(format="£%.2f")})
+    # ---- Problems & fixes ----
+    with t_problems:
+        failed = {i.rule_id for i in ev.issues}
+        passed = [r for r in RULE_NAMES if r not in failed]
+        msg = st.session_state.pop(f"fixmsg-{key}", None)
+        if msg:
+            st.success(msg, icon=":material/build:")
+        if not ev.issues:
+            st.success("All 10 checks pass — nothing to fix.", icon=":material/check_circle:")
+        roots, remaining = diagnose(b, ev.issues)
+        by_key = {f"{i.rule_id}:{i.item_sku or ''}": i for i in ev.issues}
+        for n, rc in enumerate(roots):
+            with st.container(border=True):
+                n_fix = len(rc.fixes)
+                head = f"1 root problem → fixes {n_fix} issues" if n_fix > 1 else "Likely cause"
+                st.markdown(f":violet-badge[{head}] :{CONFIDENCE_COLOUR[rc.confidence]}-badge[{rc.confidence} "
+                            f"confidence] **{rc.title}**")
+                st.write(rc.explanation)
+                explained = [by_key[k] for k in rc.fixes if k in by_key]
+                with st.expander("Explains: " + " · ".join(i.title for i in explained)):
+                    for m, issue in enumerate(explained):
+                        render_issue(issue, f"{key}-root{n}-{m}")
+                fix_button(ev, rc.fix_action, rc.fix_label, f"{key}-root-{n}-btn", key, on_fix)
+        for n, issue in enumerate(remaining):
+            render_issue(issue, f"{key}-issue-{n}", ev, on_fix, msg_key=key)
+        if llm.available():
+            flagged = {i.item_sku for i in ev.issues if i.rule_id == "R-06"}
+            unflagged = tuple((it.sku, it.description) for it in b.items
+                              if it.sku and it.description and it.sku not in flagged)
+            for h in dg_hints(unflagged):
+                st.warning(f"**Possible dangerous goods — please confirm:** {h['sku']} — {h['reason']}. "
+                           "This is an AI suggestion only; it does not change the status.",
+                           icon=":material/help:")
+        if ev.issues and passed:
+            st.caption("Passed: " + " · ".join(RULE_NAMES[r] for r in passed))
 
-    # Confirmation + next steps
-    st.markdown("#### :material/assignment_turned_in: Confirmation")
-    (st.info if ev.status == "Blocked" else st.success)(ev.summary)
-    st.caption("Delivery date is an estimate.", help=DELIVERY_ASSUMPTION)
+    # ---- Carrier ----
+    with t_carrier:
+        if rec.winner:
+            carrier_cards(rec)
+            st.write(rec.reason)
+            if rec.trade_off:
+                st.caption(f"Trade-off: {rec.trade_off}")
+        else:
+            st.error(rec.reason, icon=":material/local_shipping:")
+        if rec.all_options:
+            with st.expander("Compare all carriers on this route"):
+                st.dataframe(pd.DataFrame([{
+                    "Status": r.status, "Carrier": label(r.option), "Total cost (£)": r.total_cost,
+                    "Transit (days)": r.option.transit_days, "On time (%)": r.option.on_time_rate,
+                    "Max per pallet (kg)": r.option.max_weight_per_pallet_kg, "Notes": r.reason,
+                } for r in rec.all_options]), hide_index=True,
+                    column_config={"Total cost (£)": st.column_config.NumberColumn(format="£%.2f")})
 
-    st.markdown("#### :material/timeline: What happens next")
-    for n, s in enumerate(ev.next_steps, 1):
-        st.markdown(f"{STEP_ICON[s['state']]} **{n}. {s['step']}** — {s['detail']}")
+    # ---- Confirmation & next steps ----
+    with t_confirm:
+        (st.info if ev.status == "Blocked" else st.success)(ev.summary)
+        st.caption("Delivery date is an estimate.", help=DELIVERY_ASSUMPTION)
+        st.markdown("**What happens next**")
+        for n, s in enumerate(ev.next_steps, 1):
+            st.markdown(f"{STEP_ICON[s['state']]} **{n}. {s['step']}** — {s['detail']}")
+        st.download_button("Download booking report", html_report(ev),
+                           file_name=f"booking_{b.booking_id or 'new'}.html", mime="text/html",
+                           icon=":material/download:", key=f"{key}-download")
 
-    matches = match_buyers(b, load_directory())[:2]
-    if matches:
-        st.markdown("#### :material/storefront: Buyers for these goods")
+    # ---- Invoice ----
+    with t_invoice:
+        render_invoice(ev, key)
+
+    # ---- Buyers ----
+    with t_buyers:
+        matches = match_buyers(b, load_directory())[:3]
+        if not matches:
+            st.info("No buyers in the marketplace want these goods yet.", icon=":material/storefront:")
         for m in matches:
-            st.markdown(f"**{m.business.name}** — {' · '.join(m.reasons)}")
-        try:
-            st.page_link("app_pages/trade_connect.py", label="See all matches and message buyers in the Marketplace",
-                         icon=":material/arrow_forward:")
-        except Exception:      # rendered outside the multipage app (e.g. a test harness)
-            st.caption("See all matches and message buyers in the Marketplace.")
-
-    render_invoice(ev, key)
-
-    st.download_button("Download booking report (HTML)", html_report(ev),
-                       file_name=f"booking_{b.booking_id or 'new'}.html", mime="text/html",
-                       icon=":material/download:", key=f"{key}-download")
+            with st.container(border=True):
+                st.markdown(f"**{m.business.name}** · {m.business.city}, {m.business.country}")
+                st.caption(" · ".join(m.reasons))
+        if matches:
+            try:
+                st.page_link("app_pages/trade_connect.py", label="Message these buyers in the Marketplace",
+                             icon=":material/arrow_forward:")
+            except Exception:      # rendered outside the multipage app (e.g. a test harness)
+                st.caption("Message these buyers in the Marketplace.")

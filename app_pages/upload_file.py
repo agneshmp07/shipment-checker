@@ -1,4 +1,9 @@
-"""Upload page: Sheets 1 & 2 -> batch dashboard -> per-booking results."""
+"""Check a file: upload Sheets 1 & 2 -> summary + actions -> bookings table -> one booking in tabs.
+
+What's wrong in each booking is explained in the "What we found" pop-up, so the page itself
+stays short: three status tiles, one row of actions, a five-column table, and the selected
+booking's details organised in tabs.
+"""
 from collections import Counter
 from datetime import date
 from pathlib import Path
@@ -18,14 +23,6 @@ from ui.results import carriers_or_warning, render_evaluation, render_issue
 
 page_title("Check a bookings file", "Upload your Bookings and Items sheets and see every booking checked "
            "against the 10 rules in seconds.")
-how_to("upload", [
-    ("Upload your file", "Tap Upload and pick your .xlsx file: the Bookings and Items sheets, filled in from "
-                         "row 4. There's no submit button — it's checked as soon as it uploads."),
-    ("Read the dashboard", "See how many bookings are ready, need warnings checked, or are blocked, and "
-                           "the most common mistake."),
-    ("Open a booking and fix it", "Tap a row. Each problem shows the real numbers, why it matters and a "
-                                  "one-tap fix; the status updates instantly."),
-])
 carriers = carriers_or_warning()
 
 uploaded = st.file_uploader("Bookings file (.xlsx)", type=["xlsx"])
@@ -42,44 +39,29 @@ if uploaded is not None and st.session_state.get("upload_source") != uploaded.fi
 bookings = st.session_state.get("upload_bookings")
 file_issues = st.session_state.get("upload_file_issues", [])
 if bookings is None:
+    how_to("upload", [
+        ("Upload your file", "Tap Upload and pick your .xlsx file: the Bookings and Items sheets, filled in "
+                             "from row 4. There's no submit button — it's checked as soon as it uploads."),
+        ("See what's wrong", "A summary opens straight away: what's wrong in each booking, what to fix, and "
+                             "what we recommend."),
+        ("Fix and download", "Fix mistakes in one tap, download your corrected file, and open any booking for "
+                             "its carrier, confirmation and commercial invoice."),
+    ])
     st.stop()
 
-# No submit button is needed: say clearly that the file has been checked and where the results are.
-if bookings:
-    n = len(bookings)
-    st.success(f"Checked {n} booking{'s' if n != 1 else ''} from {st.session_state.upload_name} — "
-               "[jump to the results ↓](#results)", icon=":material/task_alt:")
-else:
-    st.error("We couldn't find any bookings in this file. The problems are listed below.",
-             icon=":material/error:")
-
-st.divider()
-st.subheader(f"Results — {st.session_state.upload_name}", anchor="results")
 if file_issues:
     with st.expander(f"{len(file_issues)} problem(s) with the file itself", icon=":material/error:",
                      expanded=not bookings):
         for n, issue in enumerate(file_issues):
             render_issue(issue, f"file-{n}")
 if not bookings:
+    st.error("We couldn't find any bookings in this file — see the problems above.", icon=":material/error:")
     st.stop()
 
 today = date.today()
 evals = [evaluate(b, carriers, today) for b in bookings]
 
-# ---- Batch dashboard -------------------------------------------------------
-counts = Counter(ev.status for ev in evals)
-rule_counts = Counter(r for ev in evals for r in {i.rule_id for i in ev.issues})
-with st.container(horizontal=True):
-    st.metric("Bookings", len(evals), border=True)
-    st.metric("🟢 Ready to ship", counts["Ready"], border=True)
-    st.metric("🟠 Ready with warnings", counts["Warnings"], border=True)
-    st.metric("🔴 Blocked", counts["Blocked"], border=True)
-if rule_counts:
-    (top_rule, top_n), = rule_counts.most_common(1)
-    name = "Problems in the input data" if top_rule == "DATA" else f"{top_rule} · {TITLES[top_rule]}"
-    st.markdown(f"**Most common problem:** {name} — in {top_n} of {len(evals)} bookings.")
 
-# ---- Fix all + corrected file ---------------------------------------------------------------
 def _fix_all():
     before = {b.booking_id: evaluate(b, carriers, today).status for b in bookings}
     changed = fix_all(bookings, lambda b: evaluate(b, carriers, today))
@@ -92,9 +74,17 @@ def _undo_all():
                             fix_all_result=None)
 
 
+# ---- Summary: three tiles + one row of actions --------------------------------------------------
+counts = Counter(ev.status for ev in evals)
+st.caption(f"Results for **{st.session_state.upload_name}** · {len(evals)} booking{'s' if len(evals) != 1 else ''}")
+with st.container(horizontal=True):
+    st.metric(":material/block: Can't ship yet", counts["Blocked"], border=True)
+    st.metric(":material/warning: Warnings", counts["Warnings"], border=True)
+    st.metric(":material/check_circle: Ready to ship", counts["Ready"], border=True)
+
 original = st.session_state.get("upload_bytes")
 corrected, changes = corrected_workbook(original, bookings) if original else (b"", [])
-problems = sum(e.status != "Ready" for e in evals)
+problems = counts["Blocked"] + counts["Warnings"]
 with st.container(horizontal=True):
     if st.button(f"See what's wrong ({problems})" if problems else "See the summary", type="primary",
                  icon=":material/report:", help="What's wrong in each booking, what to fix, and our recommendation."):
@@ -102,47 +92,48 @@ with st.container(horizontal=True):
     st.button("Fix all high-confidence mistakes", icon=":material/auto_fix_high:",
               on_click=_fix_all, help="Applies only the fixes ShipCheck is highly confident about. Guesses and "
               "things only you can decide (an HS code, booking a delivery slot) are left for you.")
-    stem = Path(st.session_state.upload_name).stem
-    st.download_button("Download corrected file", corrected or b"", file_name=f"{stem}_corrected.xlsx",
+    st.download_button("Download corrected file", corrected or b"",
+                       file_name=f"{Path(st.session_state.upload_name).stem}_corrected.xlsx",
                        icon=":material/download:", disabled=not changes,
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                        help="Your file with every fix applied, changed cells highlighted in yellow, and a "
                             "'ShipCheck changes' sheet listing what changed.")
-    if changes:
-        st.button("Undo all fixes", icon=":material/undo:", on_click=_undo_all)
 if st.session_state.pop("show_findings", False):
     findings_dialog(evals, _fix_all)
+
+# One quiet line: most common problem, what Fix all did, and undo
+notes = []
+rule_counts = Counter(r for ev in evals for r in {i.rule_id for i in ev.issues} if r != "DATA")
+if rule_counts:
+    (top_rule, top_n), = rule_counts.most_common(1)
+    notes.append(f"Most common problem: {TITLES[top_rule]} ({top_n} of {len(evals)})")
 result = st.session_state.get("fix_all_result")
 if result is not None:
     changed = result["changed"]
+    n_fixed = sum(len(v) for v in changed.values())
+    notes.append(f"Fix all corrected {n_fixed} mistake{'s' if n_fixed != 1 else ''}" if changed
+                 else "Fix all found nothing it was sure about — the rest need your decision")
+with st.container(horizontal=True, vertical_alignment="center"):
+    if notes:
+        st.caption(" · ".join(notes))
+    if changes:
+        st.button("Undo all fixes", icon=":material/undo:", on_click=_undo_all, type="tertiary")
+if result is not None and result["changed"]:
     now = {e.booking.booking_id: e.status for e in evals}
-    if changed:
-        n = sum(len(v) for v in changed.values())
-        cleared = sum(now.get(bid) == "Ready" and result["before"].get(bid) != "Ready" for bid in changed)
-        st.success(f"Fixed {n} mistake{'s' if n != 1 else ''} in {len(changed)} booking"
-                   f"{'s' if len(changed) != 1 else ''} — {cleared} now ready to ship.", icon=":material/auto_fix_high:")
-        with st.expander("See what changed"):
-            for bid, items in changed.items():
-                st.markdown(f"**{bid}** ({result['before'][bid].lower()} → {now.get(bid, '?').lower()}): "
-                            + "; ".join(items))
-    left = sum(e.status != "Ready" for e in evals)
-    if left:
-        st.info(f"{left} booking{'s' if left != 1 else ''} still need{'s' if left == 1 else ''} your decision — "
-                "open each one below to see why and fix it.", icon=":material/person_check:")
-    elif not changed:
-        st.info("Nothing needed fixing.", icon=":material/check_circle:")
+    with st.expander("See what Fix all changed", icon=":material/auto_fix_high:"):
+        for bid, items in result["changed"].items():
+            st.markdown(f"**{bid}** ({result['before'][bid].lower()} → {now.get(bid, '?').lower()}): "
+                        + "; ".join(items))
 
+# ---- Bookings table ------------------------------------------------------------------------------
 table = pd.DataFrame([{
-    "Booking": ev.booking.booking_id, "Seller": ev.booking.seller_name,
+    "Booking": ev.booking.booking_id, "Status": ev.badge,
     "Route": f"{ev.booking.origin_city} → {ev.booking.destination_city}",
-    "Status": ev.badge,
-    "Red": sum(i.severity == "Red" for i in ev.issues),
-    "Amber": sum(i.severity == "Amber" for i in ev.issues),
-    "Rules broken": ", ".join(sorted({"Input" if i.rule_id == "DATA" else i.rule_id for i in ev.issues})) or "—",
-    "Carrier": ev.recommendation.winner.option.carrier if ev.recommendation.winner else "—",
-    "Cost": fmt.money(ev.recommendation.winner.total_cost) if ev.recommendation.winner else "—",
+    "Seller": ev.booking.seller_name,
+    "Best carrier": (f"{ev.recommendation.winner.option.carrier} · {fmt.money(ev.recommendation.winner.total_cost)}"
+                     if ev.recommendation.winner else "—"),
 } for ev in evals])
-st.caption("Click a row to see that booking's details.")
+st.caption("Tap a row to open that booking.")
 event = st.dataframe(table, hide_index=True, on_select="rerun", selection_mode="single-row",
                      key="batch_table")
 rows = event.selection.rows
