@@ -61,6 +61,8 @@ class Extraction(BaseModel):
     remove_items: list[str] = Field(default_factory=list)
     confirms_proposal: Optional[bool] = Field(None, description="true if the user accepts the "
                                               "calculated values we proposed, false if they reject them")
+    unknown_fields: list[str] = Field(default_factory=list, description="fields the user says they don't "
+                                      "know, e.g. ['hs_code'] or ['country_of_origin']")
 
 
 # ---- Field labels and question order --------------------------------------
@@ -192,6 +194,16 @@ def merge(state: ChatState, ex: Extraction, today: date) -> list[str]:
         b.items = [it for it in b.items
                    if name.lower() not in ((it.sku or "").lower(), (it.description or "").lower())]
 
+    for f in ex.unknown_fields:
+        blank = [it for it in b.items if not getattr(it, f)]
+        if f in SKIPPABLE and blank:            # stop asking; the rules will flag it instead
+            for it in blank:
+                state.ask_counts[f"{it.sku}:{f}"] = MAX_ASKS
+            what = "HS code" if f == "hs_code" else "country of origin"
+            tip = " You can look it up at gov.uk/trade-tariff." if f == "hs_code" else ""
+            problems.append(f"No problem — I'll leave the {what} blank for now. It will show as an issue to "
+                            f"fix before shipping.{tip}")
+
     for patch in ex.items:
         it = _find_item(b, patch)
         if it is None:
@@ -296,14 +308,14 @@ def template_question(state: ChatState, ask: list[tuple[str, str, Optional[str]]
     if calc:
         parts.append("By my maths that's " + " and ".join(calc) + " — correct?")
     if ask:
-        names = []
+        groups: dict[Optional[str], list[str]] = {}         # questions grouped by product (None = booking)
         for _, f, sku in ask:
-            label = LABELS[f]
-            if sku and len(state.booking.items) > 1 and f != "description":
-                label += f" for {_item_name(state.booking, sku)}"
-            names.append(label)
-        joined = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
-        parts.append(f"Could you tell me {joined}?")
+            key = sku if sku and len(state.booking.items) > 1 and f != "description" else None
+            groups.setdefault(key, []).append(LABELS[f])
+        for key, names in groups.items():
+            joined = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+            lead = f"For the {_item_name(state.booking, key)}, could" if key else "Could"
+            parts.append(f"{lead} you tell me {joined}?")
     return " ".join(parts)
 
 
@@ -370,7 +382,7 @@ def _added(f: str, v, name: str = "") -> str:
 
 
 def change_summary(before: Booking, before_ev: Evaluation, after: Booking, after_ev: Evaluation,
-                   complete: bool = True) -> str:
+                   complete: bool = True, was_complete: bool = False) -> str:
     """'Got it: …' for newly given details, 'Updated: old → new' for changed ones, plus what that did
     to weight per pallet, cost, carrier and the checks."""
     added, changes = [], []
@@ -382,6 +394,11 @@ def change_summary(before: Booking, before_ev: Evaluation, after: Booking, after
             else:
                 changes.append(f"{label} {_show(f, old)} → {_show(f, new)}")
     old_items = {i.sku: i for i in before.items}
+    new_skus = {i.sku for i in after.items}
+    for gone in before.items:
+        if gone.sku not in new_skus:
+            changes.append(f"removed {gone.description or gone.sku}")
+    several = len(after.items) > 1
     for it in after.items:
         prev = old_items.get(it.sku)
         name = it.description or it.sku
@@ -390,7 +407,10 @@ def change_summary(before: Booking, before_ev: Evaluation, after: Booking, after
             old, new = (getattr(prev, f) if prev else None), getattr(it, f)
             if old != new:
                 if old is None:
-                    added.append(_added("item_cartons" if f == "cartons" else f, new, name))
+                    phrase = _added("item_cartons" if f == "cartons" else f, new, name)
+                    if several and f not in ("quantity", "cartons"):
+                        phrase = f"{name} {phrase}"          # say which product the value belongs to
+                    added.append(phrase)
                 else:
                     label = f.replace("_kg", "").replace("_", " ")
                     changes.append(f"{name} {label} {_show(f, old)} → {_show(f, new)}")
@@ -410,7 +430,7 @@ def change_summary(before: Booking, before_ev: Evaluation, after: Booking, after
     if r1.winner and (not r0.winner or r0.winner.option != r1.winner.option):
         effects.append(f"best carrier: {r1.winner.option.carrier}, {fmt.money(c1)}")
     # "Missing because not asked yet" is never news, before or (mid-conversation) after.
-    old_issues = real_issues(before_ev.issues, before)
+    old_issues = before_ev.issues if was_complete else real_issues(before_ev.issues, before)
     new_all = after_ev.issues if complete else real_issues(after_ev.issues, after)
     old_rules = {i.rule_id for i in old_issues}
     new_issues = [i for i in new_all if i.rule_id not in old_rules]
@@ -422,7 +442,7 @@ def change_summary(before: Booking, before_ev: Evaluation, after: Booking, after
     else:
         checks = ""
     if new_issues:
-        checks += (" — new: " if checks else "heads-up: ") + "; ".join(i.title for i in new_issues)
+        checks += (" — new: " if checks else "heads-up: ") + " ".join(i.explanation for i in new_issues)
     if fixed:
         checks += (" — fixed: " if checks else "fixed: ") + ", ".join(TITLES_BY_RULE.get(r, r) for r in sorted(fixed))
     tail = effects + ([checks] if checks else [])
@@ -447,12 +467,14 @@ def handle_message(state: ChatState, text: str, extractor: Extractor, carriers: 
     state.messages.append({"role": "user", "content": text})
     before = state.booking.model_copy(deep=True)
     before_ev = evaluate(before, carriers, today)
+    was_complete = is_complete(state)
 
     ex = extractor(text, state, today)
     problems = merge(state, ex, today)
     after_ev = evaluate(state.booking, carriers, today)
     state.pending = proposals(state)
-    summary = change_summary(before, before_ev, state.booking, after_ev, complete=is_complete(state))
+    summary = change_summary(before, before_ev, state.booking, after_ev, complete=is_complete(state),
+                             was_complete=was_complete)
 
     missing = missing_fields(state)
     ask = missing[:FIELDS_PER_QUESTION] if not state.pending else missing[:max(0, FIELDS_PER_QUESTION - 1)]
@@ -473,7 +495,16 @@ def handle_message(state: ChatState, text: str, extractor: Extractor, carriers: 
         parts.append("I didn't catch any booking details in that. You can change anything — for example "
                      "“add a pallet” or “ready date 10-12-2026”.")
     if is_complete(state):
-        parts.append(f"Your booking is complete — {after_ev.badge}. The full check results are shown below.")
+        reds = sum(i.severity == "Red" for i in after_ev.issues)
+        ambers = len(after_ev.issues) - reds
+        if after_ev.status == "Ready":
+            parts.append("Your booking is complete — 🟢 Ready to ship. The full check results are shown below.")
+        elif after_ev.status == "Warnings":
+            parts.append(f"Your booking is complete — 🟠 ready to ship, with {ambers} warning"
+                         f"{'s' if ambers != 1 else ''} to check below.")
+        else:
+            parts.append(f"All the details are in — 🔴 {reds} issue{'s' if reds != 1 else ''} must be fixed "
+                         "before it can ship. See the checks below for exactly what to change.")
     reply = "\n\n".join(parts)
     state.messages.append({"role": "assistant", "content": reply})
     return reply

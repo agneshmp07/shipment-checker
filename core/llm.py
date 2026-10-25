@@ -302,7 +302,9 @@ Rules:
 - total_gross_weight_kg is the weight of the whole shipment; unit_weight_kg is the weight of ONE unit.
 - If we proposed calculated values and the user says yes/correct, set confirms_proposal=true; if they say no, false. Otherwise null.
 - If the last question asked whether a delivery slot is booked, a plain yes/no answers delivery_appointment_booked.
-- HS code: digits as text, exactly as given."""
+- HS code: digits as text, exactly as given.
+- If the user says they don't know a value (e.g. "no idea what the HS code is"), put that field name
+  ("hs_code" or "country_of_origin") in unknown_fields and leave the field itself null."""
 
 
 def llm_extract(text: str, state: ChatState, today: date) -> Extraction:

@@ -125,6 +125,11 @@ def offline_extract(text: str, state: ChatState, today: date) -> Extraction:
         coo = next((c for c in ITEM_ORIGIN_COUNTRIES if c.lower() in low), None)
     if coo:
         item.country_of_origin = coo
+    dunno = r"(don'?t know|do not know|no idea|not sure|unsure|unknown)"
+    if re.search(rf"{dunno}[^.]{{0,40}}\bhs\b|\bhs\b[^.]{{0,40}}{dunno}", low):
+        ex.unknown_fields.append("hs_code")
+    if not coo and re.search(rf"{dunno}[^.]{{0,40}}(made|origin)|(made|origin)[^.]{{0,40}}{dunno}", low):
+        ex.unknown_fields.append("country_of_origin")
 
     # --- goods: "1080 mugs", "1,080 ceramic mugs" -------------------------------
     m = re.search(rf"\b{NUM}\s+(?!{NOT_GOODS})([a-z][a-z\- ]{{1,40}}?)(?=\s+(?:from|to|going|for|in|at|that|which)\b|[,.;!]|\s*$)", scan_low)

@@ -65,7 +65,7 @@ def test_change_that_breaks_a_rule_is_reported():
                 "Cheapest. We're Northfield Goods and the slot is booked"]:
         say(s, msg)
     r = say(s, "actually the slot is not booked")
-    assert "delivery slot booked → not booked" in r and "No delivery appointment at warehouse" in r
+    assert "delivery slot booked → not booked" in r and "delivery appointment is not booked" in r
 
 
 def test_rejects_values_outside_allowed_lists():
@@ -107,3 +107,32 @@ def test_hs_code_not_nagged_forever():
 ])
 def test_offline_parser_phrases(text, field, value):
     assert getattr(offline_extract(text, ChatState(), TODAY), field) == value
+
+
+
+def test_dont_know_hs_code_stops_asking_and_completes():
+    s = ChatState()
+    r1 = say(s, "1080 mugs from Manchester to a warehouse in Frankfurt")
+    r2 = say(s, "£5 each, 12 per carton, 0.5 kg each, made in United Kingdom, no idea what the HS code is")
+    assert "leave the HS code blank" in r2 and "HS code" not in r2.split("Could you tell me")[-1]
+    say(s, "yes, 3 pallets, 620 kg total, ready 05-12-2026")
+    say(s, "Cheapest. We're Northfield Goods and the slot is booked")
+    r = say(s, "yes")                                  # accept the calculated totals
+    assert is_complete(s) and "must be fixed before it can ship" in r
+
+
+def test_two_products_questions_and_summary_name_the_product():
+    s = ChatState()
+    handle_message(s, "x", lambda *_: Extraction(origin_city="London", destination_city="Paris",
+                                                  destination_type="Business address",
+                                                  items=[ItemPatch(description="mugs", quantity=300),
+                                                         ItemPatch(description="plates", quantity=200)]),
+                   STANDIN_CARRIERS, TODAY)
+    q = s.messages[-1]["content"]
+    assert "For the mugs, could you tell me" in q and q.count("for mugs") == 0
+    r = handle_message(s, "x", lambda *_: Extraction(items=[ItemPatch(match="mugs", unit_price=6),
+                                                            ItemPatch(match="plates", unit_price=4)]),
+                       STANDIN_CARRIERS, TODAY)
+    assert "mugs £6.00 each" in r and "plates £4.00 each" in r
+    r = handle_message(s, "x", lambda *_: Extraction(remove_items=["plates"]), STANDIN_CARRIERS, TODAY)
+    assert "removed plates" in r and len(s.booking.items) == 1
