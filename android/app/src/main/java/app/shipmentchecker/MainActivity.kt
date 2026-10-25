@@ -1,13 +1,16 @@
 package app.shipmentchecker
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.DownloadManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.webkit.CookieManager
+import android.webkit.PermissionRequest
 import android.webkit.URLUtil
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -25,11 +28,19 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var web: WebView
     private var fileCallback: ValueCallback<Array<Uri>>? = null
+    private var pendingMic: PermissionRequest? = null
 
     // The upload page's "Browse files" opens the phone's file picker.
     private val pickFile = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         fileCallback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data))
         fileCallback = null
+    }
+
+    // The voice button asks for the microphone; Android asks the user once.
+    private val askMic = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        pendingMic?.let { if (granted) it.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) else it.deny() }
+        pendingMic = null
+        if (!granted) Toast.makeText(this, "Microphone off: you can still type.", Toast.LENGTH_LONG).show()
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -43,6 +54,7 @@ class MainActivity : ComponentActivity() {
             domStorageEnabled = true
             loadWithOverviewMode = true
             useWideViewPort = true
+            mediaPlaybackRequiresUserGesture = false   // spoken replies play automatically
         }
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true)
 
@@ -62,6 +74,23 @@ class MainActivity : ComponentActivity() {
         }
 
         web.webChromeClient = object : WebChromeClient() {
+            override fun onPermissionRequest(request: PermissionRequest) {
+                val host = request.origin.host ?: ""
+                val wantsMic = PermissionRequest.RESOURCE_AUDIO_CAPTURE in request.resources
+                if (!wantsMic || !(host.endsWith("streamlit.app") || host.endsWith("streamlit.io"))) {
+                    request.deny()                     // only the ShipCheck site, and only the microphone
+                    return
+                }
+                runOnUiThread {
+                    if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                        request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+                    } else {
+                        pendingMic = request
+                        askMic.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                }
+            }
+
             override fun onShowFileChooser(
                 view: WebView, callback: ValueCallback<Array<Uri>>, params: FileChooserParams,
             ): Boolean {

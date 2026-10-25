@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Voice booking: the mic button records your voice (asked once, only for the ShipCheck site). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Only needed to save downloads on Android 8-9; newer versions need no permission. -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
