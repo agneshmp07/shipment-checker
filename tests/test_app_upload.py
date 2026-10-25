@@ -31,7 +31,7 @@ def test_home_renders(app):
 def test_upload_sample_shows_every_booking(app):
     app.switch_page("app_pages/upload_file.py").run()
     assert not app.exception
-    app.button[0].click().run()        # "Try the sample file"
+    next(b for b in app.button if b.label == "Try the sample file").click().run()
     assert not app.exception
     table = app.dataframe[0].value
     assert set(table["Booking"]) == set(EXPECTED)

@@ -3,6 +3,8 @@ import os
 
 import streamlit as st
 
+from ui.assistant import render_ask_ai
+
 # Streamlit Cloud / HF Spaces secrets -> env vars read by core.llm (never hard-coded).
 for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_MODEL"):
     try:
@@ -21,4 +23,6 @@ page = st.navigation([
     st.Page("app_pages/upload_file.py", title="Check a file", icon=":material/fact_check:"),
     st.Page("app_pages/trade_connect.py", title="Marketplace", icon=":material/storefront:"),
 ], position="top")
+st.session_state.current_page = page.title
+render_ask_ai(page.title)
 page.run()

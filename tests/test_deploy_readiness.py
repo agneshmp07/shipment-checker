@@ -147,7 +147,7 @@ def test_upload_and_chat_work_without_key_or_carriers(monkeypatch, tmp_path):
     monkeypatch.setenv("SHIPMENT_CARRIERS_PATH", str(tmp_path / "missing.json"))
     at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=30).run()
     at.switch_page("app_pages/upload_file.py").run()
-    at.button[0].click().run()
+    next(b for b in at.button if b.label == "Try the sample file").click().run()
     assert not at.exception
     assert any("rate card" in w.value for w in at.warning)        # clear message, no crash
     at.switch_page("app_pages/chat_booking.py").run()

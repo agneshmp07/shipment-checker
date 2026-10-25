@@ -83,6 +83,8 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
     """Full results for one booking. `key` keeps widget keys unique per booking.
     on_fix(message) is called after an Apply-fix button changes the booking."""
     b, rec = ev.booking, ev.recommendation
+    # "Ask AI" talks about the booking on screen (remembered per page)
+    st.session_state.assistant_focus = (st.session_state.get("current_page"), ev)
 
     # Header
     with st.container(border=True):

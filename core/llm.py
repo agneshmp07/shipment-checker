@@ -137,18 +137,17 @@ _THINKING_MODES = [
 _thinking_mode_for: dict[str, int] = {}
 
 
-def _gemini_generate(m: str, system: str, user: str, schema: type[BaseModel], max_tokens: int,
-                     timeout_s: float):
+def _gemini_generate(m: str, system: str, contents, extra: dict, max_tokens: int, timeout_s: float):
     first = _thinking_mode_for.get(m, 0)
     for idx in range(first, len(_THINKING_MODES)):
         config = genai_types.GenerateContentConfig(
-            system_instruction=system, response_mime_type="application/json",
-            response_json_schema=_inline_refs(schema.model_json_schema()),
+            system_instruction=system,
             max_output_tokens=max(max_tokens, 8192),        # thinking models count reasoning here too
             thinking_config=_THINKING_MODES[idx],
-            http_options=genai_types.HttpOptions(timeout=int(timeout_s * 1000)))
+            http_options=genai_types.HttpOptions(timeout=int(timeout_s * 1000)),
+            **extra)
         try:
-            resp = _gemini_client(_gemini_key()).models.generate_content(model=m, contents=user, config=config)
+            resp = _gemini_client(_gemini_key()).models.generate_content(model=m, contents=contents, config=config)
             _thinking_mode_for[m] = idx
             return resp
         except genai_errors.ClientError as e:
@@ -157,12 +156,13 @@ def _gemini_generate(m: str, system: str, user: str, schema: type[BaseModel], ma
             raise
 
 
-def _parse_gemini(system: str, user: str, schema: type[BaseModel], max_tokens: int, timeout_s: float = 25):
+def _gemini_call(system: str, contents, extra: dict, max_tokens: int, timeout_s: float) -> str:
+    """Call the configured Gemini model (backup model if it isn't found); return the reply text."""
     models = [model()] + ([GEMINI_BACKUP_MODEL] if model() != GEMINI_BACKUP_MODEL else [])
     resp = None
     for i, m in enumerate(models):
         try:
-            resp = _gemini_generate(m, system, user, schema, max_tokens, timeout_s)
+            resp = _gemini_generate(m, system, contents, extra, max_tokens, timeout_s)
             break
         except genai_errors.ClientError as e:
             if e.code == 404 and i < len(models) - 1:
@@ -175,10 +175,46 @@ def _parse_gemini(system: str, user: str, schema: type[BaseModel], max_tokens: i
     text = getattr(resp, "text", None)
     if not text:
         raise InvalidOutput("Gemini returned no text")
+    return text
+
+
+def _parse_gemini(system: str, user: str, schema: type[BaseModel], max_tokens: int, timeout_s: float = 25):
+    text = _gemini_call(system, user, {"response_mime_type": "application/json",
+                                       "response_json_schema": _inline_refs(schema.model_json_schema())},
+                        max_tokens, timeout_s)
     try:
         return schema.model_validate_json(text)
     except ValidationError as e:
         raise InvalidOutput(str(e)) from e
+
+
+def llm_text(system: str, messages: list[dict], max_tokens: int = 1500, timeout_s: float = 25) -> str:
+    """Plain-text reply to a conversation [{"role": "user"|"assistant", "content": str}].
+    Raises LLMUnavailable / InvalidOutput like _parse."""
+    p = provider()
+    if p == "anthropic":
+        key = os.environ["ANTHROPIC_API_KEY"]
+        kwargs = dict(model=model(), max_tokens=max_tokens, system=system, messages=messages,
+                      output_config={"effort": "low"})
+        try:
+            if model() in FALLBACK_MODELS:
+                resp = _client(key).beta.messages.create(betas=["server-side-fallback-2026-07-01"],
+                                                         fallbacks="default", **kwargs)
+            else:
+                resp = _client(key).messages.create(**kwargs)
+        except anthropic.APIError as e:
+            raise LLMUnavailable(f"API error: {e}") from e
+        if resp.stop_reason == "refusal":
+            raise InvalidOutput("refused")
+        text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
+        if not text:
+            raise InvalidOutput("empty reply")
+        return text
+    if p == "gemini":
+        contents = [{"role": "model" if m["role"] == "assistant" else "user", "parts": [{"text": m["content"]}]}
+                    for m in messages]
+        return _gemini_call(system, contents, {}, max_tokens, timeout_s).strip()
+    raise LLMUnavailable("No API key is configured")
 
 
 EXTRACT_SYSTEM = f"""You extract shipment booking details from a seller's chat message.
