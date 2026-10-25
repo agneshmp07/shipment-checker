@@ -11,7 +11,7 @@ confirmation shows what happens next.
 | Page | What it does |
 |---|---|
 | **Book by chat** | Describe a shipment in your own words. Only missing details are asked for (max 3 at a time); calculated values are confirmed ("That's 90 cartons — correct?"). Change anything mid-conversation ("add a pallet") and get a change summary: `Updated: pallets 3 → 4 · weight per pallet 206.7 kg → 155 kg · cost £450.00 → £600.00 · checks: all passing ✅`. A form is available too. |
-| **Upload a file** | Upload an .xlsx with the Bookings and Items sheets (or click *Try the sample file*). Batch dashboard (Ready / Warnings / Blocked, most common problem), then full results per booking. |
+| **Check a file** | Upload an .xlsx with the Bookings and Items sheets; it is checked as soon as it uploads. Batch dashboard (Ready / Warnings / Blocked, most common problem), *Fix all high-confidence mistakes*, *Download corrected file*, then full results per booking including a draft commercial invoice (PDF / Excel). |
 | **Results (both)** | Status badge · root causes ("1 root problem → fixes 2 issues", with the most likely wrong number and a confidence level) · every issue with explanation, why it matters, fix · **Apply fix** buttons that re-run all checks and show before → after · recommended carrier with reason and trade-off vs the runner-up · confirmation · next-steps timeline · downloadable HTML report. |
 | **Trade Connect** (demo data) | Directory of 14 sample businesses with filters, search and a *Request to connect* form. Sellers whose current bookings are all 🟢 get a **Pre-checked shipper ✅** badge. |
 
@@ -128,7 +128,7 @@ scripts/build_carriers.py  template Sheet 3 -> data/carriers.json
 tests/                     pytest suite; tests/fixtures/planted_mistakes.xlsx (+ generator)
 ```
 
-## Sample file with planted mistakes
+## Test file with planted mistakes (for the automated tests)
 
 `tests/fixtures/planted_mistakes.xlsx` is the case template filled in from row 4 (example row and
 all fixed sheets kept) with 14 bookings: 3 clean, each rule broken at least once,

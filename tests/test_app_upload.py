@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from tests.conftest import STANDIN_CARRIERS
-from tests.fixtures.make_planted_mistakes import EXPECTED, build
+from tests.conftest import STANDIN_CARRIERS, upload_file
+from tests.fixtures.make_planted_mistakes import EXPECTED, OUT, build
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -25,13 +25,13 @@ def app(tmp_path, monkeypatch):
 def test_home_renders(app):
     assert not app.exception
     labels = [b.label for b in app.button]
-    assert "Book by chat or voice" in labels and "See a 30-second demo" in labels
+    assert "Book by chat or voice" in labels and "See a 30-second demo" not in labels
 
 
 def test_upload_sample_shows_every_booking(app):
     app.switch_page("app_pages/upload_file.py").run()
     assert not app.exception
-    next(b for b in app.button if b.label == "Try the sample file").click().run()
+    upload_file(app, OUT)
     assert not app.exception
     table = app.dataframe[0].value
     assert set(table["Booking"]) == set(EXPECTED)
@@ -43,8 +43,7 @@ def test_upload_sample_shows_every_booking(app):
     assert metrics["Bookings"] == "14" and metrics["🟢 Ready to ship"] == "3"
 
 
-def test_home_demo_button_loads_sample(app):
-    next(b for b in app.button if b.label == "See a 30-second demo").click().run()
-    assert not app.exception
-    assert app.session_state["upload_name"] == "Sample file (planted mistakes)"
-    assert len(app.session_state["upload_bookings"]) == 14
+def test_no_sample_shortcuts_on_upload_page(app):
+    app.switch_page("app_pages/upload_file.py").run()
+    labels = [b.label for b in app.button]
+    assert not any("sample" in (l or "").lower() for l in labels)

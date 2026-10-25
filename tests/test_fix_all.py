@@ -11,7 +11,7 @@ from core.check import evaluate
 from core.diagnosis import apply_fix, fix_all, high_confidence_actions
 from core.excel_export import corrected_workbook
 from core.excel_loader import load_workbook
-from tests.conftest import STANDIN_CARRIERS
+from tests.conftest import STANDIN_CARRIERS, upload_file
 from tests.fixtures.make_planted_mistakes import OUT, build
 from tests.test_rules import booking, item
 
@@ -83,7 +83,7 @@ def test_upload_page_fix_all_button(tmp_path, monkeypatch):
     build()
     at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=60).run()
     at.switch_page("app_pages/upload_file.py").run()
-    next(b for b in at.button if b.label == "Try the sample file").click().run()
+    upload_file(at, OUT)
     next(b for b in at.button if b.label == "Fix all high-confidence mistakes").click().run()
     assert not at.exception
     assert any(s.value.startswith("Fixed 3 mistakes in 3 bookings") for s in at.success)

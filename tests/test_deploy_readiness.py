@@ -10,7 +10,7 @@ from streamlit.testing.v1 import AppTest
 from core.check import evaluate
 from core.excel_loader import load_workbook
 from scripts.build_carriers import parse
-from tests.conftest import STANDIN_CARRIERS
+from tests.conftest import STANDIN_CARRIERS, upload_file
 from tests.fixtures.make_planted_mistakes import BOOKING_HEADERS, ITEM_HEADERS, OUT, build
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -148,7 +148,8 @@ def test_upload_and_chat_work_without_key_or_carriers(monkeypatch, tmp_path):
     monkeypatch.setenv("SHIPMENT_CARRIERS_PATH", str(tmp_path / "missing.json"))
     at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=30).run()
     at.switch_page("app_pages/upload_file.py").run()
-    next(b for b in at.button if b.label == "Try the sample file").click().run()
+    build()
+    upload_file(at, OUT)
     assert not at.exception
     assert any("rate card" in w.value for w in at.warning)        # clear message, no crash
     at.switch_page("app_pages/chat_booking.py").run()

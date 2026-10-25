@@ -35,3 +35,16 @@ def fresh_streamlit_cache(monkeypatch):
     for k in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "ANTHROPIC_MODEL", "GEMINI_MODEL"):
         monkeypatch.delenv(k, raising=False)
     yield
+
+
+def upload_file(at, path, name="bookings.xlsx"):
+    """Put a workbook into the upload page's state, as a real upload does, then rerun."""
+    from pathlib import Path
+    from core.excel_loader import load_workbook
+    data = Path(path).read_bytes()
+    res = load_workbook(data)
+    for k, v in dict(upload_source=name, upload_name=name, upload_bytes=data, fix_all_result=None,
+                     upload_bookings=res.bookings, upload_file_issues=res.file_issues,
+                     upload_notes=res.notes).items():
+        at.session_state[k] = v
+    return at.run()

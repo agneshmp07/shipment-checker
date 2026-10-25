@@ -20,7 +20,7 @@ Pages:
 - Home: overview, a one-tap demo, example sentences.
 - Book by chat (or voice): describe a shipment in plain English (or tap the mic); the app asks only for
   missing details, confirms calculated values, and you can change anything ("add a pallet").
-- Check a file: upload the Bookings + Items Excel sheets (or tap "Try the sample file"); a dashboard shows
+- Check a file: upload the Bookings + Items Excel sheets (checked as soon as it uploads); a dashboard shows
   Ready / Warnings / Blocked; tap a booking to see each issue with a one-tap fix button.
 - Marketplace: directory of buyers and sellers, post your own listing, buyers matched to your bookings,
   messages inbox. Sellers whose bookings all pass get a "Pre-checked shipper" badge.
@@ -126,8 +126,9 @@ GLOSSARY = {
            "risky and should be fixed or checked.",
 }
 HOW_TO = {
-    "upload": "Go to **Check a file**, tap **Browse files** and pick your .xlsx (Bookings + Items sheets), or "
-              "tap **Try the sample file**. Then tap a booking in the table to see its problems and fixes.",
+    "upload": "Go to **Check a file**, tap **Upload** and pick your .xlsx (Bookings + Items sheets). It's "
+              "checked as soon as it uploads — scroll down to the results and tap a booking in the table "
+              "to see its problems and fixes.",
     "chat": "Go to **Book by chat** and describe your shipment, e.g. *“1080 mugs from Manchester to a "
             "warehouse in Frankfurt”* — or tap the mic and say it. I'll ask only for what's missing.",
     "fix": "Open the booking, find the issue and tap its fix button (e.g. *Set cartons for MUG-01 to 90*). "

@@ -15,10 +15,6 @@ with st.container(horizontal=True):
         st.switch_page("app_pages/chat_booking.py")
     if st.button("Check a bookings file", icon=":material/upload_file:"):
         st.switch_page("app_pages/upload_file.py")
-    if st.button("See a 30-second demo", icon=":material/play_circle:",
-                 help="Loads a sample file with 14 bookings and planted mistakes"):
-        st.session_state.load_sample = True
-        st.switch_page("app_pages/upload_file.py")
 
 def _use_example():
     """Send the tapped example to the chat page, and clear the pill for next time."""

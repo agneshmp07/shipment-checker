@@ -38,7 +38,7 @@ def test_offline_clean_booking_and_unknown_id(evals):
 
 
 @pytest.mark.parametrize("q,expect", [("what is an HS code?", "international customs code"),
-                                      ("how do I upload my excel", "Browse files"),
+                                      ("how do I upload my excel", "tap **Upload**"),
                                       ("what's a pallet", "wooden platform"),
                                       ("hello", "I can help with")])
 def test_offline_general(q, expect):

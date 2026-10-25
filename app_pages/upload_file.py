@@ -15,14 +15,11 @@ from core.rules import TITLES
 from ui.brand import how_to, page_title
 from ui.results import carriers_or_warning, render_evaluation, render_issue
 
-SAMPLE = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "planted_mistakes.xlsx"
-
 page_title("Check a bookings file", "Upload your Bookings and Items sheets and see every booking checked "
            "against the 10 rules in seconds.")
 how_to("upload", [
-    ("Upload or try the sample", "Pick your .xlsx file (the case template, filled in from row 4), or tap "
-                                 "Try the sample file. There's no submit button — it's checked as soon as "
-                                 "it uploads."),
+    ("Upload your file", "Tap Upload and pick your .xlsx file: the Bookings and Items sheets, filled in from "
+                         "row 4. There's no submit button — it's checked as soon as it uploads."),
     ("Read the dashboard", "See how many bookings are ready, need warnings checked, or are blocked, and "
                            "the most common mistake."),
     ("Open a booking and fix it", "Tap a row. Each problem shows the real numbers, why it matters and a "
@@ -31,25 +28,12 @@ how_to("upload", [
 carriers = carriers_or_warning()
 
 uploaded = st.file_uploader("Bookings file (.xlsx)", type=["xlsx"])
-with st.container(horizontal=True):
-    use_sample = st.button("Try the sample file", type="primary", icon=":material/science:",
-                           help="14 bookings with planted mistakes, including 3 clean ones")
-    use_sample = use_sample or st.session_state.pop("load_sample", False)   # from the home page demo
-    if SAMPLE.exists():
-        st.download_button("Download the sample file", SAMPLE.read_bytes(), file_name="sample_bookings.xlsx",
-                           icon=":material/download:")
 
 # Load once per file; keep the Booking objects in session state so fixes persist.
 if uploaded is not None and st.session_state.get("upload_source") != uploaded.file_id:
     res = load_workbook(uploaded.getvalue())
     st.session_state.update(upload_source=uploaded.file_id, upload_name=uploaded.name,
                             upload_bytes=uploaded.getvalue(), fix_all_result=None,
-                            upload_bookings=res.bookings, upload_file_issues=res.file_issues,
-                            upload_notes=res.notes)
-elif use_sample:
-    res = load_workbook(SAMPLE)
-    st.session_state.update(upload_source="sample", upload_name="Sample file (planted mistakes)",
-                            upload_bytes=SAMPLE.read_bytes(), fix_all_result=None,
                             upload_bookings=res.bookings, upload_file_issues=res.file_issues,
                             upload_notes=res.notes)
 
@@ -112,7 +96,7 @@ with st.container(horizontal=True):
     st.button("Fix all high-confidence mistakes", type="primary", icon=":material/auto_fix_high:",
               on_click=_fix_all, help="Applies only the fixes ShipCheck is highly confident about. Guesses and "
               "things only you can decide (an HS code, booking a delivery slot) are left for you.")
-    stem = Path(st.session_state.upload_name).stem if st.session_state.upload_source != "sample" else "sample_bookings"
+    stem = Path(st.session_state.upload_name).stem
     st.download_button("Download corrected file", corrected or b"", file_name=f"{stem}_corrected.xlsx",
                        icon=":material/download:", disabled=not changes,
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
