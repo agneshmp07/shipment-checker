@@ -33,6 +33,13 @@ def test_nan_and_infinity_from_the_ai_are_ignored():
     assert ex.items[0].quantity is None and ex.items[0].cartons == 3
 
 
+def test_unknown_field_names_from_the_ai_are_ignored():
+    from core.chat_agent import ChatState, handle_message
+    s = ChatState()
+    ex = Extraction(items=[ItemPatch(description="Mug", quantity=10)], unknown_fields=["bogus", "", "pallets"])
+    assert handle_message(s, "x", lambda *_: ex, STANDIN_CARRIERS, date.today())
+
+
 def test_nan_in_a_spreadsheet_is_not_a_number():
     for v in ("nan", float("inf"), "1e999"):
         assert parse_number(v)[0] is None

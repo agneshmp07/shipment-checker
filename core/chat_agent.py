@@ -206,6 +206,8 @@ def merge(state: ChatState, ex: Extraction, today: date) -> list[str]:
                    if name.lower() not in ((it.sku or "").lower(), (it.description or "").lower())]
 
     for f in ex.unknown_fields:
+        if f not in SKIPPABLE:                  # only these can be left blank; ignore anything else
+            continue
         blank = [it for it in b.items if not getattr(it, f)]
         if f in SKIPPABLE and blank:            # stop asking; the rules will flag it instead
             for it in blank:
