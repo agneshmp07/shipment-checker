@@ -8,3 +8,10 @@ __pycache__/
 # data/carriers.json built from the template IS committed.
 docs/
 Case2_*.xlsx
+
+# Android build output
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk
