@@ -158,7 +158,8 @@ def _gemini_generate(m: str, system: str, contents, extra: dict, max_tokens: int
 
 def _gemini_call(system: str, contents, extra: dict, max_tokens: int, timeout_s: float) -> str:
     """Call the configured Gemini model (backup model if it isn't found); return the reply text."""
-    models = [model()] + ([GEMINI_BACKUP_MODEL] if model() != GEMINI_BACKUP_MODEL else [])
+    primary = os.environ.get("GEMINI_MODEL") or GEMINI_DEFAULT_MODEL
+    models = [primary] + ([GEMINI_BACKUP_MODEL] if primary != GEMINI_BACKUP_MODEL else [])
     resp = None
     for i, m in enumerate(models):
         try:
@@ -215,6 +216,71 @@ def llm_text(system: str, messages: list[dict], max_tokens: int = 1500, timeout_
                     for m in messages]
         return _gemini_call(system, contents, {}, max_tokens, timeout_s).strip()
     raise LLMUnavailable("No API key is configured")
+
+
+# ---- Voice (Gemini only: Claude has no speech input/output) ---------------------------
+
+GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts"
+TTS_VOICE = "Kore"            # a clear, neutral prebuilt voice
+
+
+def voice_available() -> bool:
+    return bool(_gemini_key())
+
+
+def transcribe(audio: bytes, mime_type: str = "audio/wav") -> str:
+    """Speech to text for a short voice message."""
+    if not _gemini_key():
+        raise LLMUnavailable("Voice needs a Gemini key")
+    part = genai_types.Part.from_bytes(data=audio, mime_type=mime_type)
+    text = _gemini_call(
+        "You transcribe short voice messages from sellers booking shipments. Return only the words spoken, "
+        "in English, with numbers written as digits (e.g. 1080, £5, 0.5 kg). No commentary. If there is no "
+        "speech, return an empty string.",
+        [part, "Transcribe this voice message."], {}, 1000, 30)
+    return text.strip().strip('"')
+
+
+def _wav(pcm: bytes, rate: int = 24000) -> bytes:
+    """Wrap raw 16-bit mono PCM (what Gemini TTS returns) in a WAV header."""
+    import io
+    import wave
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(pcm)
+    return buf.getvalue()
+
+
+def speak(text: str) -> Optional[bytes]:
+    """Text to speech as WAV bytes, or None if unavailable (callers then use the browser's voice)."""
+    if not _gemini_key() or not text.strip():
+        return None
+    config = genai_types.GenerateContentConfig(
+        response_modalities=["AUDIO"],
+        speech_config=genai_types.SpeechConfig(voice_config=genai_types.VoiceConfig(
+            prebuilt_voice_config=genai_types.PrebuiltVoiceConfig(voice_name=TTS_VOICE))),
+        http_options=genai_types.HttpOptions(timeout=20_000))
+    try:
+        resp = _gemini_client(_gemini_key()).models.generate_content(
+            model=os.environ.get("GEMINI_TTS_MODEL") or GEMINI_TTS_MODEL,
+            contents=f"Say in a friendly, clear British voice: {text}", config=config)
+        blob = resp.candidates[0].content.parts[0].inline_data
+    except Exception:                       # any API, quota or shape problem: fall back quietly
+        return None
+    if blob is None or not blob.data:
+        return None
+    if "wav" in (blob.mime_type or ""):
+        return blob.data
+    rate = 24000
+    if blob.mime_type and "rate=" in blob.mime_type:
+        try:
+            rate = int(blob.mime_type.split("rate=")[1].split(";")[0])
+        except ValueError:
+            pass
+    return _wav(blob.data, rate)
 
 
 EXTRACT_SYSTEM = f"""You extract shipment booking details from a seller's chat message.

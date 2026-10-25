@@ -9,6 +9,7 @@ from core import assistant, llm
 from core.chat_agent import ChatState
 from core.check import evaluate
 from ui.results import get_carriers
+from ui.voice import say, transcribe
 
 SUGGESTIONS = ["Why is my booking blocked?", "How do I fix it?", "Which carrier and why?",
                "What is an HS code?", "How do I upload a file?"]
@@ -54,8 +55,20 @@ def render_ask_ai(page: str):
                                   label_visibility="collapsed")
                 if st.form_submit_button("Ask", icon=":material/send:", type="primary"):
                     pending = q.strip() or pending
+            spoken = False
+            if llm.voice_available():
+                rec = st.audio_input("Or ask by voice", key="ai_voice")
+                if rec is not None and st.session_state.get("ai_voice_seen") != rec.file_id:
+                    st.session_state.ai_voice_seen = rec.file_id          # handle each recording once
+                    with st.spinner("Listening…"):
+                        heard = transcribe(rec)
+                    if heard:
+                        pending, spoken = heard, True
+            speak = st.toggle("Speak answers", key="ai_speak", value=False)
             if pending:
                 ask(pending, page)
+                if spoken or speak:
+                    say(st.session_state.ai_history[-1]["content"])
             history = st.session_state.get("ai_history", [])
             if not history:
                 st.pills("Try", SUGGESTIONS, key="ai_suggestion", on_change=_pick_suggestion,

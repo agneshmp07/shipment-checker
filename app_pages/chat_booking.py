@@ -12,6 +12,7 @@ from core.models import DESTINATION_TYPES, ITEM_ORIGIN_COUNTRIES, ORIGIN_CITIES,
 from core.offline_parser import offline_extract
 from ui.brand import how_to, page_title
 from ui.results import carriers_or_warning, render_evaluation, status_badge
+from ui.voice import say, transcribe
 
 GREETING = ("Hi! Tell me about your shipment in your own words — what you're sending, how many, and from "
             "where to where. For example: *“I'm sending 1080 mugs from Manchester to a warehouse in "
@@ -77,7 +78,18 @@ chat_col, card_col = st.columns([3, 2], gap="large")
 # ---- Chat --------------------------------------------------------------------
 with chat_col:
     history = st.container(height=520)
-    prompt = st.chat_input("Describe your shipment, answer a question, or change something…")
+    voice_in = llm.voice_available()
+    raw = st.chat_input("Type, or tap the mic and speak…" if voice_in else
+                        "Describe your shipment, answer a question, or change something…",
+                        accept_audio=voice_in, key="chat_box")
+    prompt, spoken = (raw, False) if isinstance(raw, str) or raw is None else ((raw.text or "").strip() or None, False)
+    recording = getattr(raw, "audio", None) if raw is not None and not isinstance(raw, str) else None
+    if recording is not None:
+        with st.spinner("Listening…"):
+            heard = transcribe(recording)
+        if heard:
+            prompt, spoken = heard, True
+            st.session_state.speak_replies = True          # you spoke, so I answer out loud
     prompt = prompt or st.session_state.pop("chat_prefill", None)      # example tapped on Home
     if len(state.messages) == 1 and not prompt:
         st.pills("Or tap an example", key="chat_example", on_change=lambda: st.session_state.update(
@@ -86,10 +98,22 @@ with chat_col:
                      "500 cotton t-shirts from London to a shop in Paris, as fast as possible"])
     if prompt:
         send(prompt)
+        if spoken:
+            state.messages[-2]["content"] = "🎤 " + state.messages[-2]["content"]
+        if st.session_state.get("speak_replies"):
+            st.session_state.say_next = state.messages[-1]["content"]
     with history:
         for m in state.messages:
             with st.chat_message(m["role"]):
                 st.markdown(m["content"])
+    with st.container(horizontal=True, vertical_alignment="center"):
+        st.toggle("Read replies aloud", key="speak_replies", help="The assistant speaks its questions. "
+                  "Turns on automatically when you use the mic.")
+        if not voice_in:
+            st.caption(":material/mic_off: Voice input needs the Gemini key.")
+    say_next = st.session_state.pop("say_next", None)
+    if say_next:
+        say(say_next)
     if st.button("Start over", icon=":material/restart_alt:"):
         del st.session_state["chat"]
         st.rerun()
