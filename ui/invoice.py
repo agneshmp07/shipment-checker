@@ -66,9 +66,9 @@ def render_invoice(ev: Evaluation, key: str):
     else:
         st.caption(f"All invoice details are filled in. Total £{inv.invoice_total:,.2f}.")
     with st.container(horizontal=True):
-        st.download_button("Invoice (PDF)", invoice_pdf(inv), file_name=f"{inv.number}.pdf",
+        st.download_button("Invoice (PDF)", lambda: invoice_pdf(inv),          # built on click file_name=f"{inv.number}.pdf",
                            mime="application/pdf", icon=":material/picture_as_pdf:", key=f"{key}-inv-pdf",
                            type="primary")
-        st.download_button("Invoice (Excel)", invoice_xlsx(inv), file_name=f"{inv.number}.xlsx",
+        st.download_button("Invoice (Excel)", lambda: invoice_xlsx(inv), file_name=f"{inv.number}.xlsx",
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                            icon=":material/table_view:", key=f"{key}-inv-xlsx")

@@ -64,7 +64,7 @@ def next_steps(b: Booking, rec: Recommendation, issues: list[Issue]) -> list[dic
     steps.append({"step": "Label cartons", "state": "todo",
                   "detail": f"Label all {fmt.num(b.cartons)} cartons with the booking ID {b.booking_id or ''}, "
                             "SKU and carton number (e.g. 1 of "
-                            f"{fmt.num(b.cartons)}), so the warehouse can count them."})
+                            f"{fmt.num(b.cartons)}), so the warehouse can count them. Print the carton labels below."})
     steps.append({"step": "Prepare the commercial invoice", "state": "todo",
                   "detail": "The document customs relies on: every item with its description, HS code, "
                             f"country of origin, quantity and value — total {fmt.money(b.total_declared_value)}. "

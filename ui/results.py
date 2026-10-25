@@ -12,6 +12,8 @@ from core.carriers import label, load_carriers
 from core.check import Evaluation, evaluate
 from core.diagnosis import apply_fix, diagnose
 from core.confirmation import DELIVERY_ASSUMPTION
+from core.dangerous_goods import possible_battery
+from core.labels import labels_pdf
 from core.report import html_report
 from core.rules import RULE_NAMES
 from core.trade_connect import load_directory, match_buyers
@@ -135,6 +137,14 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
                 fix_button(ev, rc.fix_action, rc.fix_label, f"{key}-root-{n}-btn", key, on_fix)
         for n, issue in enumerate(remaining):
             render_issue(issue, f"{key}-issue-{n}", ev, on_fix, msg_key=key)
+        flagged_dg = {i.item_sku for i in ev.issues if i.rule_id == "R-06"}
+        for it in b.items:
+            word = possible_battery(it.description) if it.sku not in flagged_dg else None
+            if word:
+                st.warning(f"**Please confirm — possible built-in lithium battery:** {it.sku} "
+                           f"({it.description}) looks like a battery-powered product (“{word}”). If it has a "
+                           "lithium battery, it needs the carrier's dangerous-goods paperwork. This doesn't "
+                           "change the status.", icon=":material/battery_alert:")
         if llm.available():
             flagged = {i.item_sku for i in ev.issues if i.rule_id == "R-06"}
             unflagged = tuple((it.sku, it.description) for it in b.items
@@ -149,14 +159,19 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
     # ---- Carrier ----
     with t_carrier:
         if rec.winner:
+            st.markdown(f"**{rec.headline}**")
             carrier_cards(rec)
             st.write(rec.reason)
             if rec.trade_off:
                 st.caption(f"Trade-off: {rec.trade_off}")
         else:
             st.error(rec.reason, icon=":material/local_shipping:")
+            if rec.all_options:
+                carrier_cards(rec)
         if rec.all_options:
-            with st.expander("Compare all carriers on this route"):
+            with st.expander("All the numbers, and how “Balanced” is scored"):
+                st.caption("Balanced scores each carrier 0–1 on cost (lower is better), speed (fewer days is "
+                           "better) and on-time rate (higher is better), then weights them 40% · 30% · 30%.")
                 st.dataframe(pd.DataFrame([{
                     "Status": r.status, "Carrier": label(r.option), "Total cost (£)": r.total_cost,
                     "Transit (days)": r.option.transit_days, "On time (%)": r.option.on_time_rate,
@@ -171,9 +186,21 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
         st.markdown("**What happens next**")
         for n, s in enumerate(ev.next_steps, 1):
             st.markdown(f"{STEP_ICON[s['state']]} **{n}. {s['step']}** — {s['detail']}")
-        st.download_button("Download booking report", html_report(ev),
-                           file_name=f"booking_{b.booking_id or 'new'}.html", mime="text/html",
-                           icon=":material/download:", key=f"{key}-download")
+        if any(i.rule_id in ("R-03", "R-04") for i in ev.issues):
+            st.caption(":material/warning: Fix the carton counts first, so the labels match what you declared.")
+        inv = st.session_state.get(f"invoice-details-{b.booking_id}")
+        consignee = None
+        if inv is not None:
+            consignee = (inv.buyer_name if inv.consignee_same_as_buyer else inv.consignee_name) or None
+        with st.container(horizontal=True):
+            st.download_button("Carton labels (PDF)", lambda: labels_pdf(b, consignee),   # built on click
+                               file_name=f"labels_{b.booking_id or 'new'}.pdf", mime="application/pdf",
+                               icon=":material/label:", key=f"{key}-labels", type="primary",
+                               help="One label per carton — “Carton 1 of 90” — with product, units, "
+                                    "from / to and a barcode. 8 labels per A4 sheet.")
+            st.download_button("Booking report", lambda: html_report(ev),
+                               file_name=f"booking_{b.booking_id or 'new'}.html", mime="text/html",
+                               icon=":material/download:", key=f"{key}-download")
 
     # ---- Invoice ----
     with t_invoice:

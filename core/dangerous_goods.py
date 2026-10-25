@@ -28,6 +28,12 @@ KEYWORDS = {
     "hand sanitizer": "flammable liquid (alcohol-based)",
     "alcohol-based": "flammable liquid (alcohol-based)",
     "methylated spirits": "flammable liquid",
+    # other names sellers use for the same risks
+    "aftershave": "flammable liquid", "body spray": "aerosol", "spray paint": "aerosol",
+    "e-liquid": "flammable liquid (vape)", "vape juice": "flammable liquid (vape)",
+    "e-cig": "lithium battery", "gas canister": "flammable gas", "camping gas": "flammable gas",
+    "matches": "flammable (matches)", "firelighter": "flammable", "nail polish remover": "flammable liquid",
+    "white spirit": "flammable liquid", "isopropyl": "flammable liquid", "rubbing alcohol": "flammable liquid",
 }
 
 # Phrases that mean the item is NOT dangerous; removed before keyword matching.
@@ -81,3 +87,23 @@ def detect(description: Optional[str], sku: Optional[str], hs_code: Optional[str
         if digits.startswith(prefix):
             signals.append(f"HS code {hs_code} starts with {prefix} ({what})")
     return signals
+
+
+# Products that usually contain a built-in lithium battery. These are not blocked (plenty of
+# sellers ship them with the right paperwork), but the seller is asked to confirm.
+BATTERY_DEVICES = [
+    "earbuds", "earphones", "headphones", "headset", "airpods", "bluetooth", "wireless speaker",
+    "smartwatch", "smart watch", "fitness tracker", "smartphone", "mobile phone", "laptop", "tablet",
+    "e-reader", "electric toothbrush", "electric shaver", "hair clipper", "drone", "e-scooter",
+    "electric scooter", "hoverboard", "rechargeable", "cordless", "usb-c powered", "camera",
+]
+_DEVICE = [(w, _pattern(w)) for w in sorted(BATTERY_DEVICES, key=len, reverse=True)]
+
+
+def possible_battery(description: Optional[str]) -> Optional[str]:
+    """The device word found, if the product probably has a built-in battery (else None)."""
+    t = _clean(description or "")
+    for word, pat in _DEVICE:
+        if pat.search(t):
+            return word
+    return None

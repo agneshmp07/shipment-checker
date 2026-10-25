@@ -115,6 +115,7 @@ class Recommendation(BaseModel):
     winner: Optional[CarrierResult] = None
     runner_up: Optional[CarrierResult] = None
     reason: str = ""
+    headline: str = ""          # the choice in one line, e.g. "Carrier A: lowest cost at £540.00 and ..."
     trade_off: str = ""
     all_options: list[CarrierResult] = Field(default_factory=list)
     weight_per_pallet: Optional[float] = None

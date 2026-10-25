@@ -85,6 +85,24 @@ def _reason(win: CarrierResult, priority: str, pallets: float, n_eligible: int) 
            f"({fmt.num(c.transit_days)} days, {fmt.num(c.on_time_rate)}% on time)."
 
 
+def _headline(win: CarrierResult, priority: str, n_eligible: int, wpp: float) -> str:
+    """The choice in one line: what makes it best for this priority, and that it can take the weight."""
+    c = win.option
+    fits = f"within its weight limit ({fmt.kg(wpp)} per pallet, max {fmt.kg(c.max_weight_per_pallet_kg)})"
+    if n_eligible == 1:
+        why = f"the only carrier that can take {fmt.kg(wpp)} per pallet"
+        return f"{c.carrier}: {why} — {fmt.money(win.total_cost)}, {fmt.num(c.transit_days)} days."
+    if priority == "Fastest":
+        why = f"fastest at {fmt.num(c.transit_days)} days"
+    elif priority == "Most reliable":
+        why = f"most reliable at {fmt.num(c.on_time_rate)}% on time"
+    elif priority == "Balanced":
+        why = f"best balance of cost, speed and reliability (score {win.score:.2f})"
+    else:
+        why = f"lowest cost at {fmt.money(win.total_cost)}"
+    return f"{c.carrier}: {why} and {fits}."
+
+
 def _cap(s: str) -> str:
     return s[:1].upper() + s[1:]
 
@@ -160,6 +178,7 @@ def recommend(b: Booking, carriers: list[CarrierOption]) -> Recommendation:
         rec.runner_up = ranked[1]
         rec.trade_off = trade_off(ranked[0], ranked[1])
     rec.reason = _reason(ranked[0], priority, b.pallets, len(ranked))
+    rec.headline = _headline(ranked[0], priority, len(ranked), wpp)
     if not b.seller_priority:
         rec.reason = "No priority given, so Balanced is used. " + rec.reason
     rec.all_options = ranked + eliminated

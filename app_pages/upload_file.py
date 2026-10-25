@@ -34,7 +34,7 @@ if uploaded is not None and st.session_state.get("upload_source") != uploaded.fi
                             upload_bytes=uploaded.getvalue(), fix_all_result=None, show_findings=True,
                             focus_booking=None,
                             upload_bookings=res.bookings, upload_file_issues=res.file_issues,
-                            upload_notes=res.notes)
+                            upload_notes=res.notes, upload_pristine=[b.model_dump() for b in res.bookings])
 
 bookings = st.session_state.get("upload_bookings")
 file_issues = st.session_state.get("upload_file_issues", [])
@@ -71,7 +71,7 @@ def _fix_all():
 def _undo_all():
     res = load_workbook(st.session_state.upload_bytes)
     st.session_state.update(upload_bookings=res.bookings, upload_file_issues=res.file_issues,
-                            fix_all_result=None)
+                            fix_all_result=None, upload_pristine=[b.model_dump() for b in res.bookings])
 
 
 # ---- Summary: three tiles + one row of actions --------------------------------------------------
@@ -83,7 +83,8 @@ with st.container(horizontal=True):
     st.metric(":material/check_circle: Ready to ship", counts["Ready"], border=True)
 
 original = st.session_state.get("upload_bytes")
-corrected, changes = corrected_workbook(original, bookings) if original else (b"", [])
+pristine = st.session_state.get("upload_pristine")
+changes = bool(original) and (pristine is None or [b.model_dump() for b in bookings] != pristine)
 problems = counts["Blocked"] + counts["Warnings"]
 with st.container(horizontal=True):
     if st.button(f"See what's wrong ({problems})" if problems else "See the summary", type="primary",
@@ -92,7 +93,7 @@ with st.container(horizontal=True):
     st.button("Fix all high-confidence mistakes", icon=":material/auto_fix_high:",
               on_click=_fix_all, help="Applies only the fixes ShipCheck is highly confident about. Guesses and "
               "things only you can decide (an HS code, booking a delivery slot) are left for you.")
-    st.download_button("Download corrected file", corrected or b"",
+    st.download_button("Download corrected file", lambda: corrected_workbook(original, bookings)[0],
                        file_name=f"{Path(st.session_state.upload_name).stem}_corrected.xlsx",
                        icon=":material/download:", disabled=not changes,
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

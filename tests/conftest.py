@@ -45,6 +45,7 @@ def upload_file(at, path, name="bookings.xlsx"):
     res = load_workbook(data)
     for k, v in dict(upload_source=name, upload_name=name, upload_bytes=data, fix_all_result=None,
                      upload_bookings=res.bookings, upload_file_issues=res.file_issues,
-                     upload_notes=res.notes).items():
+                     upload_notes=res.notes,
+                     upload_pristine=[b.model_dump() for b in res.bookings]).items():
         at.session_state[k] = v
     return at.run()

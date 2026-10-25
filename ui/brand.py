@@ -113,7 +113,7 @@ _RESULT_CSS = """<style>
 .sc-Warnings .sc-ico{background:#FF9F43}.sc-Warnings .sc-kick{color:#FFC48C}
 .sc-Blocked{background:linear-gradient(135deg,rgba(255,90,95,.2),rgba(255,90,95,.05));border-color:rgba(255,90,95,.5)}
 .sc-Blocked .sc-ico{background:#FF5A5F}.sc-Blocked .sc-kick{color:#FF9EA1}
-.sc-carriers{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin:4px 0 8px}
+.sc-carriers{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:4px 0 8px}
 .sc-carrier{position:relative;background:#12243D;border:1px solid #22406A;border-radius:16px;padding:18px 18px 14px;
   animation:scFadeUp .45s ease-out both;transition:transform .2s,box-shadow .2s}
 .sc-carrier:hover{transform:translateY(-3px);box-shadow:0 12px 26px rgba(0,0,0,.28)}
@@ -122,9 +122,14 @@ _RESULT_CSS = """<style>
 .sc-rib{display:inline-block;font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
   padding:3px 10px;border-radius:99px;background:#F2690F;color:#fff;margin-bottom:8px}
 .sc-rib.sc-alt{background:#22406A;color:#B9C8DC}
+.sc-rib.sc-bad{background:rgba(255,90,95,.18);color:#FF9EA1}
+.sc-carrier.sc-out{opacity:.62}
+.sc-cnote{margin-top:10px;font-size:.84rem;color:#B9C8DC;border-top:1px dashed #22406A;padding-top:8px}
+.sc-cnote-bad{color:#FF9EA1}
 .sc-cname{font-family:'Plus Jakarta Sans',Inter,sans-serif;font-weight:800;font-size:1.2rem;color:#fff}
 .sc-csvc{color:#8DA2BE;font-size:.88rem;margin-bottom:8px}
-.sc-cprice{font-family:'Plus Jakarta Sans',Inter,sans-serif;font-weight:800;font-size:1.9rem;color:#fff}
+.sc-cprice{font-family:'Plus Jakarta Sans',Inter,sans-serif;font-weight:800;font-size:clamp(1.35rem,3.6vw,1.9rem);
+  color:#fff;white-space:nowrap}
 .sc-cprice small{font-size:.85rem;color:#8DA2BE;font-weight:600}
 .sc-cstats{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .sc-cstats span{font-size:.82rem;color:#EAF0F7;background:rgba(255,255,255,.06);border:1px solid #22406A;
@@ -152,19 +157,42 @@ def status_banner(ev):
         <div class="sc-sub">{escape(sub)}</div></div></div>""")
 
 
+def _versus(r, win) -> str:
+    """How this carrier compares with the recommended one: '+£120 · 2 days faster · +3 pts on time'."""
+    parts = []
+    dc = (r.total_cost or 0) - (win.total_cost or 0)
+    if abs(dc) > 0.005:
+        parts.append(f"{'+' if dc > 0 else '−'}£{abs(dc):,.0f}")
+    dd = r.option.transit_days - win.option.transit_days
+    if dd:
+        parts.append(f"{abs(dd):g} day{'s' if abs(dd) != 1 else ''} {'slower' if dd > 0 else 'faster'}")
+    dr = r.option.on_time_rate - win.option.on_time_rate
+    if dr:
+        parts.append(f"{'+' if dr > 0 else '−'}{abs(dr):g} pts on time")
+    return " · ".join(parts) or "same cost, speed and reliability"
+
+
 def carrier_cards(rec):
-    """Recommended and runner-up carriers side by side."""
+    """Every carrier on the route side by side: the recommended one first, ruled-out ones greyed."""
     from html import escape
+    win = rec.winner
     cards = []
-    for r, tag in ((rec.winner, "Recommended"), (rec.runner_up, "Runner-up")):
-        if r is None:
-            continue
+    for r in rec.all_options:
         o = r.option
+        out = r.status == "Eliminated"
+        tag = {"Recommended": "Recommended", "Runner-up": "Runner-up", "Eligible": "Option"}.get(r.status, "Ruled out")
+        cls = " sc-win" if r.status == "Recommended" else " sc-out" if out else ""
+        rib = "" if r.status == "Recommended" else " sc-bad" if out else " sc-alt"
+        if out:
+            note = f'<div class="sc-cnote sc-cnote-bad">{escape(r.reason)}</div>'
+        elif win is not None and r is not win:
+            note = f'<div class="sc-cnote">vs {escape(win.option.carrier)}: {escape(_versus(r, win))}</div>'
+        else:
+            note = ""
         cards.append(
-            f'<div class="sc-carrier{" sc-win" if tag == "Recommended" else ""}">'
-            f'<span class="sc-rib{"" if tag == "Recommended" else " sc-alt"}">{tag}</span>'
+            f'<div class="sc-carrier{cls}"><span class="sc-rib{rib}">{tag}</span>'
             f'<div class="sc-cname">{escape(o.carrier)}</div><div class="sc-csvc">{escape(o.service)}</div>'
-            f'<div class="sc-cprice">£{r.total_cost:,.2f} <small>total</small></div>'
+            f'<div class="sc-cprice">£{(r.total_cost or 0):,.2f} <small>total</small></div>'
             f'<div class="sc-cstats"><span>⏱ {o.transit_days:g} days</span><span>🎯 {o.on_time_rate:g}% on time</span>'
-            f'<span>⚖ up to {o.max_weight_per_pallet_kg:,.0f} kg/pallet</span></div></div>')
+            f'<span>⚖ max {o.max_weight_per_pallet_kg:,.0f} kg/pallet</span></div>{note}</div>')
     st.html(f'{_CSS}{_RESULT_CSS}<div class="sc-carriers">{"".join(cards)}</div>')
