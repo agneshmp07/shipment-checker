@@ -187,3 +187,24 @@ def test_gemini_phrase_and_dg(monkeypatch):
                               '{"hints": [{"sku": "EB-1", "reason": "earbuds contain a lithium battery"}]}'])
     assert llm.llm_phrase(ChatState(), [], "How many pallets?") == "Lovely! How many pallets?"
     assert llm.llm_dg_second_opinion([("EB-1", "Wireless earbuds")])[0].sku == "EB-1"
+
+
+def test_gemini_thinking_falls_back_when_unsupported(monkeypatch):
+    llm._thinking_mode_for.clear()
+    bad = genai_errors.ClientError(400, {"error": {"code": 400, "message": "thinking_level not supported",
+                                                   "status": "INVALID_ARGUMENT"}})
+    calls = fake_gemini(monkeypatch, [bad, Extraction(pallets=1).model_dump_json(),
+                                      Extraction(pallets=2).model_dump_json()])
+    assert llm.llm_extract("1 pallet", ChatState(), TODAY).pallets == 1
+    first, second = calls.calls[0]["config"].thinking_config, calls.calls[1]["config"].thinking_config
+    assert first.thinking_level is not None and second.thinking_budget == 0
+    llm.llm_extract("2 pallets", ChatState(), TODAY)                    # remembered: no failed attempt
+    assert calls.calls[2]["config"].thinking_config.thinking_budget == 0
+
+
+def test_gemini_timeouts_per_purpose(monkeypatch):
+    llm._thinking_mode_for.clear()
+    calls = fake_gemini(monkeypatch, [Extraction().model_dump_json(), '{"text": "Q?"}'])
+    llm.llm_extract("hi", ChatState(), TODAY)
+    llm.llm_phrase(ChatState(), [], "Q?")
+    assert [c["config"].http_options.timeout for c in calls.calls] == [25000, 8000]

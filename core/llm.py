@@ -80,14 +80,14 @@ def _gemini_client(key: str) -> genai.Client:
     return genai.Client(api_key=key, http_options=genai_types.HttpOptions(timeout=45_000))
 
 
-def _parse(system: str, user: str, schema: type[BaseModel], max_tokens: int = 4000):
+def _parse(system: str, user: str, schema: type[BaseModel], max_tokens: int = 4000, timeout_s: float = 25):
     """One structured-output call to whichever provider is configured.
     Raises LLMUnavailable on API problems, InvalidOutput on unusable replies."""
     p = provider()
     if p == "anthropic":
         return _parse_anthropic(system, user, schema, max_tokens)
     if p == "gemini":
-        return _parse_gemini(system, user, schema, max_tokens)
+        return _parse_gemini(system, user, schema, max_tokens, timeout_s)
     raise LLMUnavailable("No API key is configured")
 
 
@@ -126,16 +126,43 @@ def _inline_refs(schema: dict) -> dict:
     return walk(schema)
 
 
-def _parse_gemini(system: str, user: str, schema: type[BaseModel], max_tokens: int):
-    config = genai_types.GenerateContentConfig(
-        system_instruction=system, response_mime_type="application/json",
-        response_json_schema=_inline_refs(schema.model_json_schema()),
-        max_output_tokens=max(max_tokens, 8192))     # thinking models count reasoning here too
+# Thinking slows every reply; this app only extracts fields, so ask for as little as the
+# model allows. Gemini 3 takes thinking_level, Gemini 2.5 takes thinking_budget; whichever
+# the model accepts first is remembered per model.
+_THINKING_MODES = [
+    genai_types.ThinkingConfig(thinking_level=genai_types.ThinkingLevel.MINIMAL),
+    genai_types.ThinkingConfig(thinking_budget=0),
+    None,
+]
+_thinking_mode_for: dict[str, int] = {}
+
+
+def _gemini_generate(m: str, system: str, user: str, schema: type[BaseModel], max_tokens: int,
+                     timeout_s: float):
+    first = _thinking_mode_for.get(m, 0)
+    for idx in range(first, len(_THINKING_MODES)):
+        config = genai_types.GenerateContentConfig(
+            system_instruction=system, response_mime_type="application/json",
+            response_json_schema=_inline_refs(schema.model_json_schema()),
+            max_output_tokens=max(max_tokens, 8192),        # thinking models count reasoning here too
+            thinking_config=_THINKING_MODES[idx],
+            http_options=genai_types.HttpOptions(timeout=int(timeout_s * 1000)))
+        try:
+            resp = _gemini_client(_gemini_key()).models.generate_content(model=m, contents=user, config=config)
+            _thinking_mode_for[m] = idx
+            return resp
+        except genai_errors.ClientError as e:
+            if e.code == 400 and idx < len(_THINKING_MODES) - 1:
+                continue                                    # this thinking setting isn't supported
+            raise
+
+
+def _parse_gemini(system: str, user: str, schema: type[BaseModel], max_tokens: int, timeout_s: float = 25):
     models = [model()] + ([GEMINI_BACKUP_MODEL] if model() != GEMINI_BACKUP_MODEL else [])
     resp = None
     for i, m in enumerate(models):
         try:
-            resp = _gemini_client(_gemini_key()).models.generate_content(model=m, contents=user, config=config)
+            resp = _gemini_generate(m, system, user, schema, max_tokens, timeout_s)
             break
         except genai_errors.ClientError as e:
             if e.code == 404 and i < len(models) - 1:
@@ -144,7 +171,7 @@ def _parse_gemini(system: str, user: str, schema: type[BaseModel], max_tokens: i
         except genai_errors.APIError as e:
             raise LLMUnavailable(f"Gemini error {e.code}: {e.message}") from e
         except Exception as e:                       # network / timeout
-            raise LLMUnavailable(f"Gemini unavailable: {e}") from e
+            raise LLMUnavailable(f"Gemini unavailable: {type(e).__name__}") from e
     text = getattr(resp, "text", None)
     if not text:
         raise InvalidOutput("Gemini returned no text")
@@ -207,7 +234,9 @@ Do not add questions, facts or advice. At most 3 short sentences. Plain English,
 
 def llm_phrase(state: ChatState, ask: list, template: str) -> Optional[str]:
     try:
-        return _parse(PHRASE_SYSTEM, f"Question to rewrite: {template}", Question, max_tokens=2000).text
+        # Nice-to-have only: if it isn't quick, the code-built question is used instead.
+        return _parse(PHRASE_SYSTEM, f"Question to rewrite: {template}", Question, max_tokens=2000,
+                      timeout_s=8).text
     except (LLMUnavailable, InvalidOutput):
         return None
 

@@ -35,13 +35,21 @@ if not st.session_state.ai_ok:
 
 
 def extract(text, s, today):
-    """LLM first; on any failure switch to the offline parser for the rest of the session."""
+    """LLM first. A failed turn uses the offline parser; two failures in a row switch the
+    AI off for the rest of the session so nobody waits on a broken connection."""
     if st.session_state.ai_ok:
         try:
-            return llm.llm_extract(text, s, today)
+            result = llm.llm_extract(text, s, today)
+            st.session_state.ai_failures = 0
+            return result
         except llm.LLMUnavailable as e:
-            st.session_state.ai_ok = False
+            st.session_state.ai_failures = st.session_state.get("ai_failures", 0) + 1
             st.session_state.ai_error = str(e)[:120]
+            if st.session_state.ai_failures >= 2:
+                st.session_state.ai_ok = False
+            else:
+                st.toast("The AI was slow to answer, so the built-in parser read that message.",
+                         icon=":material/bolt:")
     return offline_extract(text, s, today)
 
 
