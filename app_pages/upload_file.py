@@ -13,6 +13,7 @@ from core.excel_export import corrected_workbook
 from core.excel_loader import load_workbook
 from core.rules import TITLES
 from ui.brand import how_to, page_title
+from ui.findings import findings_dialog
 from ui.results import carriers_or_warning, render_evaluation, render_issue
 
 page_title("Check a bookings file", "Upload your Bookings and Items sheets and see every booking checked "
@@ -33,7 +34,8 @@ uploaded = st.file_uploader("Bookings file (.xlsx)", type=["xlsx"])
 if uploaded is not None and st.session_state.get("upload_source") != uploaded.file_id:
     res = load_workbook(uploaded.getvalue())
     st.session_state.update(upload_source=uploaded.file_id, upload_name=uploaded.name,
-                            upload_bytes=uploaded.getvalue(), fix_all_result=None,
+                            upload_bytes=uploaded.getvalue(), fix_all_result=None, show_findings=True,
+                            focus_booking=None,
                             upload_bookings=res.bookings, upload_file_issues=res.file_issues,
                             upload_notes=res.notes)
 
@@ -92,8 +94,12 @@ def _undo_all():
 
 original = st.session_state.get("upload_bytes")
 corrected, changes = corrected_workbook(original, bookings) if original else (b"", [])
+problems = sum(e.status != "Ready" for e in evals)
 with st.container(horizontal=True):
-    st.button("Fix all high-confidence mistakes", type="primary", icon=":material/auto_fix_high:",
+    if st.button(f"See what's wrong ({problems})" if problems else "See the summary", type="primary",
+                 icon=":material/report:", help="What's wrong in each booking, what to fix, and our recommendation."):
+        st.session_state.show_findings = True
+    st.button("Fix all high-confidence mistakes", icon=":material/auto_fix_high:",
               on_click=_fix_all, help="Applies only the fixes ShipCheck is highly confident about. Guesses and "
               "things only you can decide (an HS code, booking a delivery slot) are left for you.")
     stem = Path(st.session_state.upload_name).stem
@@ -104,6 +110,8 @@ with st.container(horizontal=True):
                             "'ShipCheck changes' sheet listing what changed.")
     if changes:
         st.button("Undo all fixes", icon=":material/undo:", on_click=_undo_all)
+if st.session_state.pop("show_findings", False):
+    findings_dialog(evals, _fix_all)
 result = st.session_state.get("fix_all_result")
 if result is not None:
     changed = result["changed"]
@@ -138,7 +146,17 @@ st.caption("Click a row to see that booking's details.")
 event = st.dataframe(table, hide_index=True, on_select="rerun", selection_mode="single-row",
                      key="batch_table")
 rows = event.selection.rows
-selected = rows[0] if rows else 0
+ids = [e.booking.booking_id for e in evals]
+focus = st.session_state.get("focus_booking")
+if rows:
+    selected = rows[0]
+    st.session_state.focus_booking = None
+elif focus in ids:
+    selected = ids.index(focus)
+    if st.session_state.pop("focus_toast", False):
+        st.toast(f"Showing {focus} — scroll down to its details.", icon=":material/arrow_downward:")
+else:
+    selected = 0
 
 st.divider()
 render_evaluation(evals[selected], key=f"upload-{selected}")
