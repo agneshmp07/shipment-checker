@@ -213,11 +213,16 @@ def r06_dangerous_goods(b: Booking) -> list[Issue]:
     for it in b.items:
         signals = detect(it.description, it.sku, it.hs_code)
         if signals:
+            found = " ".join(signals).lower()
+            # an example of "not actually dangerous" that fits what was detected
+            example = ("e.g. a pump spray, not a pressurised aerosol can" if "aerosol" in found else
+                       "e.g. alcohol-free or water-based" if "flammable" in found else
+                       "e.g. no battery inside")
             out.append(_issue("R-06", b,
                               f"{_name(it)} ({it.description or 'no description'}) looks like dangerous "
                               f"goods: {'; '.join(signals)}.",
                               f"Remove {_name(it)} from this shipment, or if it is not actually dangerous "
-                              "(e.g. no battery inside), make the description say so clearly. Dangerous "
+                              f"({example}), make the description say so clearly. Dangerous "
                               "goods need a specialist dangerous-goods service, not this booking.",
                               it.sku))
     return out
