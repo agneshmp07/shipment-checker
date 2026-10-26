@@ -54,10 +54,10 @@ def test_popup_opens_after_upload_and_open_selects_booking(tmp_path, monkeypatch
     upload_file(at, OUT)
     assert not at.exception
     labels = [b.label for b in at.button]
-    assert "Open BK-107" in labels and any(l.startswith("See what's wrong (") for l in labels)
+    assert "Fix BK-107" in labels and any(l.startswith("See what's wrong (") for l in labels)
     text = " ".join(m.value for m in at.markdown)
     assert "**What's wrong**" in text and "**Our recommendation**" in text
-    next(b for b in at.button if b.label == "Open BK-107").click().run()
+    next(b for b in at.button if b.key == "find-open-BK-107").click().run()      # "View details"
     assert not at.exception and at.session_state["focus_booking"] == "BK-107"
     banners = [h.proto.body for h in at.get("html") if 'class="sc-banner' in h.proto.body]
     assert banners and ">BK-107" in banners[0]

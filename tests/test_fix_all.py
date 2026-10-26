@@ -86,32 +86,42 @@ def _upload_page(tmp_path, monkeypatch):
     return upload_file(at, OUT)
 
 
-def test_findings_popup_applies_ticked_fixes_per_booking(tmp_path, monkeypatch):
+def _open_fix_window(at, bid):
+    at.session_state["fix_target"] = bid
+    return at.run()
+
+
+def test_fix_window_applies_the_ticked_fixes(tmp_path, monkeypatch):
     at = _upload_page(tmp_path, monkeypatch)
-    at.session_state["show_findings"] = True
-    at.run()
-    picks = [c for c in at.checkbox if c.key and c.key.startswith("pick-")]
-    assert picks and any(c.value for c in picks) and not all(c.value for c in picks)   # High ticked, rest not
-    button = next(b for b in at.button if b.label.startswith("Apply ticked fixes (") and not b.disabled)
-    n = int(button.label.split("(")[1].rstrip(")"))
-    at.session_state["show_findings"] = True     # the harness re-runs the page, so keep the pop-up open for the click
-    button.click().run()
+    from ui.correct import suggestions
+    bid = next(b.booking_id for b in at.session_state["upload_bookings"]
+               if suggestions(evaluate(b, STANDIN_CARRIERS, date.today())))
+    _open_fix_window(at, bid)
+    assert any(m.value.startswith(f"### {bid}") for m in at.markdown)
+    picks = [c for c in at.checkbox if c.key and c.key.startswith(f"pick-{bid}-")]
+    assert picks
+    for c in picks:
+        c.check()
+    _open_fix_window(at, bid)                      # the harness re-runs the page, so keep the window open
+    at.session_state["fix_target"] = bid
+    next(b for b in at.button if b.label.startswith("Apply ")).click().run()
     assert not at.exception
-    assert any(f"Corrected {n} mistake" in c.value for c in at.caption)
-    assert any(b.label == "Undo all fixes" for b in at.button)
-    next(b for b in at.button if b.label == "Undo all fixes").click().run()
-    assert not any(b.label == "Undo all fixes" for b in at.button)
+    assert len(at.session_state["fix_all_result"]["changed"][bid]) == len(picks)
+    assert any(b.label == "← Back to all problems" for b in at.button)       # still in the fix window
 
 
-def test_edit_a_booking_by_hand(tmp_path, monkeypatch):
+def test_fix_window_change_it_yourself_shows_only_the_fields_needed(tmp_path, monkeypatch):
     at = _upload_page(tmp_path, monkeypatch)
-    bid = at.session_state["upload_bookings"][0].booking_id
-    at.session_state["focus_booking"] = bid
-    at.session_state["manual_open"] = bid
-    at.run()
-    total = next(n for n in at.number_input if n.label == "Total cartons")
-    total.set_value((total.value or 0) + 7)
+    bk = next(b for b in at.session_state["upload_bookings"]
+              if {i.rule_id for i in evaluate(b, STANDIN_CARRIERS, date.today()).issues} == {"R-04"})
+    _open_fix_window(at, bk.booking_id)
+    labels = {n.label for n in at.number_input}
+    assert "Total cartons" in labels                             # R-04 needs only the carton total…
+    assert not labels & {"Pallets", "Gross weight (kg)", "Declared value (£)"}   # …not every field
+    next(n for n in at.number_input if n.label == "Total cartons").set_value(
+        sum(it.cartons for it in bk.items))
+    at.session_state["fix_target"] = bk.booking_id
     next(b for b in at.button if b.label == "Save & re-check").click().run()
     assert not at.exception
-    assert any("(manual)" in m for m in at.session_state["fix_all_result"]["changed"][bid])
-    assert any(b.label == "Undo all fixes" for b in at.button)
+    assert any("(manual)" in m for m in at.session_state["fix_all_result"]["changed"][bk.booking_id])
+    assert any("now passes all 10 checks" in s.value for s in at.success)

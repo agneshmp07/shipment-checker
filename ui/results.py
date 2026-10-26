@@ -17,7 +17,6 @@ from core.labels import MAX_LABELS, label_count, labels_pdf
 from core.report import html_report
 from core.rules import scorecard
 from core.trade_connect import load_directory, match_buyers
-from ui import correct
 from ui.brand import carrier_cards, rule_chips, status_banner
 from ui.invoice import render_invoice
 
@@ -117,10 +116,11 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
     # ---- Problems & fixes ----
     with t_problems:
         st.html(rule_chips(scorecard(b, ev.issues)))      # R-01 … R-10: passed, broken or not checked
-        if editable:                                    # upload page: correct this booking by hand
-            with st.expander("Edit this booking by hand", icon=":material/edit:",
-                             expanded=st.session_state.get("manual_open") == b.booking_id):
-                correct.manual_editor(ev, key)
+        if editable and ev.issues:                      # upload page: the same fix window as the pop-up
+            if st.button(f"Fix {b.booking_id}", key=f"{key}-fix", type="primary", icon=":material/build:",
+                         help="Apply our fixes or change the fields yourself, in one window."):
+                st.session_state.fix_target = b.booking_id
+                st.rerun()
         msg = st.session_state.pop(f"fixmsg-{key}", None)
         if msg:
             st.success(msg, icon=":material/build:")

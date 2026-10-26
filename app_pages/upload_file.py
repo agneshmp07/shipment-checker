@@ -18,7 +18,7 @@ from core.excel_export import corrected_workbook
 from core.excel_loader import load_workbook
 from core.rules import RULE_NAMES, TITLES, scorecard
 from ui.brand import how_to, page_title
-from ui import scan
+from ui import fixflow, scan
 from ui.findings import findings_dialog
 from ui.results import carriers_or_warning, render_evaluation, render_issue
 
@@ -100,7 +100,10 @@ with st.container(horizontal=True):
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                        help="Your file with every fix applied, changed cells highlighted in yellow, and a "
                             "'Oops-Proof changes' sheet listing what changed.")
-if st.session_state.pop("show_findings", False):
+fix_target = st.session_state.pop("fix_target", None)
+if fix_target:                                         # one booking's fix window
+    fixflow.fix_dialog(fix_target)
+elif st.session_state.pop("show_findings", False):     # the list of problems
     findings_dialog(evals, _fix_all)
 
 # One quiet line: most common problem, what Fix all did, and undo

@@ -8,7 +8,7 @@ import streamlit as st
 from core.check import Evaluation
 from core.findings import findings
 from core.rules import scorecard
-from ui import correct
+from ui import correct, fixflow
 
 STATUS = {"Blocked": ("red", ":material/block:", "Can't ship yet"),
           "Warnings": ("orange", ":material/warning:", "Can ship — check the warnings"),
@@ -39,8 +39,8 @@ def findings_dialog(evals: list[Evaluation], fix_all: Callable[[], None]):
         st.success("Every booking passes all 10 checks — they're ready to ship.", icon=":material/check_circle:")
         return
 
-    st.write("Here's what needs attention, starting with the bookings that can't ship yet. For each one you'll "
-             "see what's wrong, what to change, and what we recommend.")
+    st.write("Here's what needs attention, starting with the bookings that can't ship yet. Press **Fix** on a "
+             "booking to correct it — we'll fix what we can, you change the rest, then come straight back here.")
     if st.button("Fix all high-confidence mistakes", type="primary", icon=":material/auto_fix_high:",
                  help="Applies only the fixes we're confident about; the rest stay for you to decide."):
         fix_all()
@@ -61,26 +61,18 @@ def findings_dialog(evals: list[Evaluation], fix_all: Callable[[], None]):
                        + (f" · broke {', '.join(broke)}" if broke else "")
                        + (f" · not checked (data missing): {', '.join(unchecked)}" if unchecked else ""))
             st.markdown(":material/error: **What's wrong**\n" + _bullets(f.wrong))
-            st.markdown(":material/build: **What to fix** — tick the fixes we can make for you")
-            picks = correct.fix_list(ev, f.fix)
             if f.recommend:
                 st.markdown(":material/lightbulb: **Our recommendation**\n" + _bullets(f.recommend))
             bid = b.booking_id
-            with st.container(horizontal=True):
-                if picks:
-                    n = sum(bool(st.session_state.get(s["key"])) for s in picks)
-                    if st.button(f"Apply ticked fixes ({n})", key=f"find-apply-{bid}", type="primary",
-                                 icon=":material/auto_fix_high:", disabled=n == 0):
-                        correct.apply_picks(ev, picks)
-                        st.session_state.show_findings = True          # reopen with the updated results
-                        st.rerun()
-                if st.button("Edit by hand", key=f"find-edit-{bid}", icon=":material/edit:",
-                             help="Opens this booking with every field and item ready to edit."):
-                    _open(bid)
-                    st.session_state.manual_open = bid
+            autos = correct.suggestions(ev)
+            with st.container(horizontal=True, vertical_alignment="center"):
+                if st.button(f"Fix {bid}", key=f"find-fix-{bid}", type="primary", icon=":material/build:",
+                             help="Opens this booking: apply our fixes or change the fields yourself, then come back."):
+                    fixflow.open_fix(bid)
                     st.rerun()
-                if st.button(f"Open {bid}", key=f"find-open-{bid}", icon=":material/open_in_new:",
-                             on_click=_open, args=(bid,)):
+                st.caption(f":material/auto_fix_high: {len(autos)} automatic fix{'es' if len(autos) != 1 else ''} "
+                           "ready" if autos else ":material/edit: Needs your input — you'll see exactly what to change")
+                if st.button("View details", key=f"find-open-{bid}", type="tertiary", on_click=_open, args=(bid,)):
                     st.rerun()
 
     if ready:
