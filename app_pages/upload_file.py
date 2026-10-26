@@ -18,6 +18,7 @@ from core.excel_export import corrected_workbook
 from core.excel_loader import load_workbook
 from core.rules import TITLES
 from ui.brand import how_to, page_title
+from ui import scan
 from ui.findings import findings_dialog
 from ui.results import carriers_or_warning, render_evaluation, render_issue
 
@@ -31,7 +32,7 @@ uploaded = st.file_uploader("Bookings file (.xlsx)", type=["xlsx"])
 if uploaded is not None and st.session_state.get("upload_source") != uploaded.file_id:
     res = load_workbook(uploaded.getvalue())
     st.session_state.update(upload_source=uploaded.file_id, upload_name=uploaded.name,
-                            upload_bytes=uploaded.getvalue(), fix_all_result=None, show_findings=True,
+                            upload_bytes=uploaded.getvalue(), fix_all_result=None, show_findings=True, play_scan=True,
                             focus_booking=None,
                             upload_bookings=res.bookings, upload_file_issues=res.file_issues,
                             upload_notes=res.notes, upload_pristine=[b.model_dump() for b in res.bookings])
@@ -60,6 +61,9 @@ if not bookings:
 
 today = date.today()
 evals = [evaluate(b, carriers, today) for b in bookings]
+if st.session_state.pop("play_scan", False):          # once per new file: the checking animation
+    st.html(scan.overlay(evals, st.session_state.get("upload_name", "your file")))
+    st.html(scan.SKIP_JS, unsafe_allow_javascript=True)
 
 
 def _fix_all():
