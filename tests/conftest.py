@@ -34,6 +34,7 @@ def fresh_streamlit_cache(monkeypatch):
     st.cache_data.clear()
     for k in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "ANTHROPIC_MODEL", "GEMINI_MODEL"):
         monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("OOPS_PROOF_NO_SECRETS", "1")     # ignore a local .streamlit/secrets.toml too
     yield
 
 

@@ -7,7 +7,9 @@ from ui.assistant import render_ask_ai
 from ui.brand import global_style
 
 # Streamlit Cloud / HF Spaces secrets -> env vars read by core.llm (never hard-coded).
-for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_MODEL"):
+# Tests set OOPS_PROOF_NO_SECRETS so a key in a local secrets.toml is never used by them.
+SECRET_NAMES = ("ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_MODEL")
+for name in () if os.environ.get("OOPS_PROOF_NO_SECRETS") else SECRET_NAMES:
     try:
         if name in st.secrets and not os.environ.get(name):
             os.environ[name] = str(st.secrets[name])
