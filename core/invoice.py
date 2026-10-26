@@ -3,7 +3,9 @@
 Follows the UK government's export-invoice guide: invoice number and date, seller and buyer
 (and consignee), related paperwork, unit price / currency / payment / discounts, weights and
 number of goods, HS codes, incoterms, package marks, country of origin, transport route,
-total value, additional charges, and a declaration. Everything Oops-Proof knows is filled in
+total value, additional charges, and a declaration. Optionally, the statement on origin from the
+UK-EU Trade and Cooperation Agreement, in the wording published on GOV.UK ("Proving originating
+status and claiming a reduced rate of Customs Duty for trade between the UK and EU"). Everything Oops-Proof knows is filled in
 from the booking; what only the seller knows comes from a short form and is otherwise
 marked TO COMPLETE.
 """
@@ -42,11 +44,16 @@ class InvoiceDetails(BaseModel):
     consignee_same_as_buyer: bool = True
     consignee_name: str = ""
     consignee_address: str = ""
+    buyer_vat_eori: str = ""
     po_number: str = ""
+    po_date: str = ""
     incoterm: str = ""
     payment_terms: str = ""
     discount_pct: float = 0.0
     insurance_gbp: float = 0.0
+    other_charges_label: str = ""
+    other_charges_gbp: float = 0.0
+    origin_statement: bool = False        # the seller confirms the goods meet the UK-EU rules of origin
 
 
 class InvoiceLine(BaseModel):
@@ -76,6 +83,7 @@ class Invoice(BaseModel):
     packages: list[tuple[str, str]]
     transport: list[tuple[str, str]]
     missing: list[str]                    # fields the seller still has to fill in
+    origin_statement: list[str] = []      # the statement on origin, line by line ([] = not claimed)
 
 
 def _v(text: str, label: str, missing: list[str]) -> str:
@@ -94,7 +102,8 @@ def build_invoice(ev: Evaluation, d: InvoiceDetails, issued: Optional[date] = No
               _v(d.seller_contact, "Seller contact (email / phone)", missing),
               f"VAT / EORI: {_v(d.seller_vat_eori, 'Seller VAT / EORI number', missing)}"]
     buyer = [_v(d.buyer_name, "Buyer name", missing), _v(d.buyer_address, "Buyer address", missing),
-             _v(d.buyer_contact, "Buyer contact (email / phone)", missing)]
+             _v(d.buyer_contact, "Buyer contact (email / phone)", missing),
+             f"EU VAT / EORI: {_v(d.buyer_vat_eori, 'Buyer EU VAT / EORI number', missing)}"]
     if d.consignee_same_as_buyer:
         consignee = ["Same as buyer"]
     else:
@@ -104,7 +113,8 @@ def build_invoice(ev: Evaluation, d: InvoiceDetails, issued: Optional[date] = No
     term_text = (f"{incoterm} {b.destination_city or ''} (Incoterms 2020)".strip() if incoterm
                  else _v("", "Incoterms agreed with the buyer", missing))
     references = [("Booking", b.booking_id or "-"),
-                  ("Purchase order", _v(d.po_number, "Purchase order / proforma number", missing)),
+                  ("Purchase order", f"{_v(d.po_number, 'Purchase order / proforma number', missing)}, dated "
+                                     f"{_v(d.po_date, 'Purchase order / proforma date', missing)}"),
                   ("Incoterms", term_text),
                   ("Payment terms", _v(d.payment_terms, "Payment terms", missing)),
                   ("Currency", b.currency or "GBP")]
@@ -126,6 +136,8 @@ def build_invoice(ev: Evaluation, d: InvoiceDetails, issued: Optional[date] = No
                         f"{fmt.num(b.pallets)} pallet{'s' if b.pallets != 1 else ''})", rec.winner.total_cost))
     if d.insurance_gbp:
         charges.append(("Insurance", round(d.insurance_gbp, 2)))
+    if d.other_charges_gbp:
+        charges.append((d.other_charges_label.strip() or "Other charges", round(d.other_charges_gbp, 2)))
     total = round(goods + sum(a for _, a in charges), 2)
 
     net = sum(l.net_weight_kg for l in lines)
@@ -138,13 +150,28 @@ def build_invoice(ev: Evaluation, d: InvoiceDetails, issued: Optional[date] = No
                   if rec.winner else "Not yet chosen"),
                  ("Collection", fmt.d(b.ready_date))]
 
+    # Statement on origin (UK-EU TCA), official English wording. Only when the seller confirms the goods
+    # meet the rules of origin; items not made in the UK are listed as not covered.
+    statement = []
+    uk = [l for l in lines if l.origin.strip().lower() == "united kingdom"]
+    if d.origin_statement and uk:
+        eori = d.seller_vat_eori.strip() or TODO
+        statement = [f"The exporter of the products covered by this document (Exporter Reference Number {eori}) "
+                     "declares that, except where otherwise clearly indicated, these products are of United "
+                     "Kingdom preferential origin."]
+        others = [l.sku for l in lines if l not in uk]
+        if others:
+            statement.append("Not covered by this statement (not of UK origin): " + ", ".join(others) + ".")
+        statement += [f"{b.origin_city or ''}, {fmt.d(issued)} (Place and date)",
+                      f"{b.seller_name or TODO} (Name of the exporter)"]
+
     reds = [i for i in ev.issues if i.severity == "Red"]
     draft = (f"{len(reds)} issue{'s' if len(reds) != 1 else ''} must be fixed first: "
              + "; ".join(sorted({i.title for i in reds})) if reds else "")
     return Invoice(number=f"INV-{b.booking_id or 'NEW'}-{issued.strftime('%Y%m%d')}", issued=issued,
                    draft_reason=draft, seller=seller, buyer=buyer, consignee=consignee, references=references,
                    lines=lines, charges=charges, goods_total=goods, invoice_total=total, packages=packages,
-                   transport=transport, missing=missing)
+                   transport=transport, missing=missing, origin_statement=statement)
 
 
 DECLARATION = ("I declare that the information on this invoice is true and correct, and that the "
@@ -237,6 +264,15 @@ def invoice_pdf(inv: Invoice) -> bytes:
 
     pairs("Packages and marks", inv.packages)
     pairs("Transport", inv.transport)
+    if inv.origin_statement:
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_text_color(*orange)
+        pdf.cell(0, 5, "STATEMENT ON ORIGIN (UK-EU TRADE AND COOPERATION AGREEMENT)", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 9)
+        for ln in inv.origin_statement:
+            pdf.set_text_color(*(orange if TODO in ln else navy))
+            pdf.multi_cell(0, 5, _cut(ln, 400), new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
     pdf.set_font("Helvetica", "", 9)
     pdf.set_text_color(*navy)
     pdf.multi_cell(0, 5, _latin(DECLARATION), new_x="LMARGIN", new_y="NEXT")
@@ -246,8 +282,10 @@ def invoice_pdf(inv: Invoice) -> bytes:
     pdf.ln(4)
     pdf.set_font("Helvetica", "I", 7.5)
     pdf.set_text_color(*grey)
-    pdf.multi_cell(0, 4, "Draft prepared by Oops-Proof from the booking. Check every detail before use; some "
-                   "markets need the invoice in the buyer's language or certified by a chamber of commerce.")
+    pdf.multi_cell(0, 4, "Draft prepared by Oops-Proof from the booking, following the UK government's export "
+                   "invoice checklist. Check every detail before use; some markets need the invoice in the buyer's "
+                   "language or certified by a chamber of commerce. Only claim preferential origin if the goods "
+                   "meet the UK-EU rules of origin.")
     return bytes(pdf.output())
 
 
@@ -302,6 +340,11 @@ def invoice_xlsx(inv: Invoice) -> bytes:
         put(0, [title], b=True)
         for k, v in rows:
             put(0, [k, v])
+        ws.append([])
+    if inv.origin_statement:
+        put(0, ["Statement on origin (UK-EU Trade and Cooperation Agreement)"], b=True)
+        for ln in inv.origin_statement:
+            put(0, ["", ln])
         ws.append([])
     put(0, [DECLARATION])
     put(0, ["Signed:", "", "Date:", fmt.d(inv.issued)])

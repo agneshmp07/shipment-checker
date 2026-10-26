@@ -14,7 +14,8 @@ TODAY = date(2026, 10, 25)
 FULL = InvoiceDetails(seller_address="12 Mill Lane, Manchester", seller_contact="sales@example.com",
                       seller_vat_eori="GB123456789000", buyer_name="Haus & Herd GmbH",
                       buyer_address="Hanauer Landstr. 1, Frankfurt", buyer_contact="einkauf@example.de",
-                      po_number="PO-778", incoterm="DAP", payment_terms="Bank transfer, 30 days")
+                      buyer_vat_eori="DE123456789", po_number="PO-778", po_date="20-10-2026",
+                      incoterm="DAP", payment_terms="Bank transfer, 30 days")
 
 
 def inv_for(b, d=FULL):
@@ -48,7 +49,8 @@ def test_discount_and_insurance():
 def test_missing_fields_listed_and_marked():
     inv = inv_for(booking(), InvoiceDetails())
     assert "Buyer name" in inv.missing and "Incoterms agreed with the buyer" in inv.missing
-    assert inv.buyer[0] == TODO and len(inv.missing) == 9
+    assert "Buyer EU VAT / EORI number" in inv.missing and "Purchase order / proforma date" in inv.missing
+    assert inv.buyer[0] == TODO and len(inv.missing) == 11
 
 
 def test_draft_when_booking_has_red_issues():
@@ -67,3 +69,44 @@ def test_pdf_and_excel_output():
     values = [c.value for row in ws.iter_rows() for c in row if c.value is not None]
     assert "COMMERCIAL INVOICE" in values and "691200" in values and 5400 in values
     assert any(isinstance(v, str) and TODO in v for v in values)
+
+
+def test_po_date_and_buyer_eori_printed():
+    inv = inv_for(booking())
+    assert ("Purchase order", "PO-778, dated 20-10-2026") in inv.references
+    assert "EU VAT / EORI: DE123456789" in inv.buyer
+
+
+def test_other_charges_line():
+    inv = inv_for(booking(), FULL.model_copy(update={"incoterm": "EXW", "other_charges_label": "Chamber certification",
+                                                      "other_charges_gbp": 40}))
+    assert ("Chamber certification", 40.0) in inv.charges and inv.invoice_total == 5440
+
+
+OFFICIAL = ("The exporter of the products covered by this document (Exporter Reference Number GB123456789000) "
+            "declares that, except where otherwise clearly indicated, these products are of United Kingdom "
+            "preferential origin.")
+
+
+def test_origin_statement_uses_the_official_wording():
+    assert inv_for(booking()).origin_statement == []                         # only when the seller ticks it
+    inv = inv_for(booking(), FULL.model_copy(update={"origin_statement": True}))
+    assert inv.origin_statement[0] == OFFICIAL
+    assert inv.origin_statement[-1].endswith("(Name of the exporter)")
+
+
+def test_origin_statement_excludes_items_not_made_in_the_uk():
+    b = booking([item(), item(sku="BOWL-02", country_of_origin="China")], cartons=180, total_declared_value=10800,
+                total_gross_weight_kg=1300)
+    inv = inv_for(b, FULL.model_copy(update={"origin_statement": True}))
+    assert "Not covered by this statement (not of UK origin): BOWL-02." in inv.origin_statement
+    only_china = booking([item(country_of_origin="China")])
+    assert inv_for(only_china, FULL.model_copy(update={"origin_statement": True})).origin_statement == []
+
+
+def test_origin_statement_in_pdf_and_excel():
+    inv = inv_for(booking(), FULL.model_copy(update={"origin_statement": True}))
+    assert invoice_pdf(inv).startswith(b"%PDF")
+    ws = openpyxl.load_workbook(io.BytesIO(invoice_xlsx(inv))).active
+    texts = [c.value for row in ws.iter_rows() for c in row if isinstance(c.value, str)]
+    assert OFFICIAL in texts
