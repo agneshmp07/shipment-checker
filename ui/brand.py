@@ -47,7 +47,9 @@ _CSS = """
 .sc-step:hover{transform:translateY(-4px);border-color:#F2690F;box-shadow:0 16px 32px rgba(0,0,0,.3)}
 /* hero right side: the 3D mascot looking at the booking card */
 .sc-side{flex:1 1 560px;max-width:680px;position:relative;min-height:440px}
-.sc-side .sc-pv{position:absolute;right:0;bottom:0;width:318px;font-size:.8rem;z-index:2}
+.sc-side .sc-pv{position:absolute;right:0;top:56px;width:318px;font-size:.8rem;z-index:2}
+/* the carton gets its own space left of the card, so the card can never cover it */
+@media (min-width:761px){.sc-side .sc-mascot{right:330px}}
 @media (max-width:760px){.sc-side{flex-basis:100%;min-height:0;display:flex;flex-direction:column;gap:6px}
   .sc-side .sc-pv{position:relative;width:auto}}
 @media (max-width:480px){.sc-pv{padding:14px}.sc-pv-val{font-size:.74rem}.sc-pv-row{gap:6px}}
@@ -78,7 +80,8 @@ _CSS = """
 .sc-pv-btn{display:inline-grid;font-weight:700;font-size:.76rem;border-radius:8px;overflow:hidden;animation:scPress 10s ease infinite}
 .sc-pv-btn>*{grid-area:1/1;padding:6px 12px}
 .sc-pv-btn .sc-a{background:#F2690F;color:#fff}.sc-pv-btn .sc-b{background:#2ECC71;color:#0E1B2E}
-.sc-pv-foot{margin-top:10px;color:#8FA3BD;font-size:.78rem;animation:scFoot 10s ease infinite}
+.sc-pv-foot{margin-top:10px;color:#8FA3BD;font-size:.78rem}
+.sc-pv-foot .sc-b{color:#B9E8CB}
 .sc-sw{display:grid}.sc-sw>*{grid-area:1/1}
 .sc-a{animation:scA 10s ease infinite}.sc-b{animation:scB 10s cubic-bezier(.34,1.56,.64,1) infinite}
 .sc-pill.sc-b{animation:scB 10s cubic-bezier(.34,1.56,.64,1) infinite,scGlow 10s ease infinite}
@@ -92,16 +95,15 @@ _CSS = """
 @keyframes scB{0%,37%{opacity:0;transform:translateY(5px) scale(.9)}43%,94%{opacity:1;transform:none}98%,100%{opacity:0;transform:translateY(5px) scale(.9)}}
 @keyframes scGlow{0%,41%{box-shadow:0 0 0 0 rgba(46,204,113,0)}46%{box-shadow:0 0 0 6px rgba(46,204,113,.35)}
   56%,100%{box-shadow:0 0 0 0 rgba(46,204,113,0)}}
-@keyframes scCause{0%,8%{opacity:0;transform:translateY(8px)}15%,94%{opacity:1;transform:none}99%,100%{opacity:0;transform:translateY(8px)}}
+@keyframes scCause{0%{opacity:.35}5%,100%{opacity:1}}
 @keyframes scPress{0%,34%,40%,100%{transform:none;filter:none}37%{transform:scale(.92);filter:brightness(.85)}}
-@keyframes scFoot{0%,42%{opacity:0;transform:translateY(4px)}48%,94%{opacity:1;transform:none}99%,100%{opacity:0}}
 @keyframes scTap{0%,19%{opacity:0;transform:translate(120px,80px)}23%{opacity:1}33%{transform:translate(0,0)}
   37%{transform:translate(0,0) scale(.75)}39%{transform:translate(0,0) scale(1)}46%{opacity:1;transform:translate(0,0)}
   54%,100%{opacity:0;transform:translate(70px,60px)}}
 @keyframes scRing{0%,36%{opacity:0;transform:scale(1)}37%{opacity:1;transform:scale(1)}46%,100%{opacity:0;transform:scale(2.6)}}
 @keyframes scConf{0%,38%{opacity:0;transform:translate(-50%,-50%) scale(.3)}40%{opacity:1}
-  58%{opacity:1;transform:translate(calc(-50% + var(--x)),calc(-50% + var(--y))) rotate(var(--r)) scale(1)}
-  64%,100%{opacity:0;transform:translate(calc(-50% + var(--x)),calc(-50% + var(--y) + 18px)) rotate(var(--r))}}
+  50%{opacity:1;transform:translate(calc(-50% + var(--x)),calc(-50% + var(--y))) rotate(var(--r)) scale(1)}
+  55%,100%{opacity:0;transform:translate(calc(-50% + var(--x)),calc(-50% + var(--y) + 18px)) rotate(var(--r))}}
 @media (prefers-reduced-motion:reduce){.sc-a,.sc-tap,.sc-conf{display:none}.sc-b{opacity:1;animation:none}
   .sc-pv-cause,.sc-pv-foot,.sc-pv-btn{animation:none}}
 @media (prefers-reduced-motion:reduce){.sc-hero,.sc-step,.sc-banner,.sc-carrier{animation:none!important;transition:none!important}}
@@ -126,7 +128,7 @@ _PREVIEW = """<div class="sc-pv" aria-label="Live example: booking BK-105 goes f
   <div>SOCK-01 cartons should be <b>50</b>, not 45</div>
   <div class="sc-pv-btnwrap"><div class="sc-pv-btn"><span class="sc-a">Set cartons to 50</span><span class="sc-b">✓ Fixed</span></div>
    <i class="sc-conf" style="--x:-46px;--y:-38px;--r:120deg;background:#FF8A3D"></i><i class="sc-conf" style="--x:-22px;--y:-56px;--r:-80deg;background:#2ECC71"></i><i class="sc-conf" style="--x:6px;--y:-62px;--r:200deg;background:#F2C744"></i><i class="sc-conf" style="--x:34px;--y:-50px;--r:-140deg;background:#7DB4FF"></i><i class="sc-conf" style="--x:54px;--y:-26px;--r:90deg;background:#FF5A5F"></i><i class="sc-conf" style="--x:-58px;--y:-6px;--r:-60deg;background:#2ECC71"></i><i class="sc-conf" style="--x:60px;--y:4px;--r:160deg;background:#F2C744"></i><i class="sc-conf" style="--x:-30px;--y:18px;--r:40deg;background:#FF8A3D"></i><span class="sc-tap"></span></div></div>
- <div class="sc-pv-foot">Recommended: Carrier B · £210 · 3 days</div>
+ <div class="sc-pv-foot sc-sw"><span class="sc-a">Fix it to see the best carrier</span><span class="sc-b">Recommended: Carrier B · £210 · 3 days</span></div>
 </div>"""
 
 

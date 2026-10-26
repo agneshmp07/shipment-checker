@@ -97,7 +97,7 @@ JS = """<script>
     }
 
     const rig = new T.Group(); scene.add(rig);           // turns toward the pointer
-    const wide = () => box.clientWidth > 420;            // desktop: carton left of centre, card at lower right
+    const wide = () => innerWidth > 760;                  // desktop: the card sits to the right of the carton
     const bodyG = new T.Group(); rig.add(bodyG);          // hops, breathes, spins
     const body = new T.Mesh(faceted(2.3, 1.85, 1.75, 3, 0.07), cardboard); bodyG.add(body);
     // top flaps, slightly open, and the tape across them
@@ -200,9 +200,12 @@ JS = """<script>
     let visible = true;
     new IntersectionObserver(es => { visible = es[0].isIntersecting; }).observe(box);   // rest when off-screen
 
+    let baseZ = 7.4;
     function resize() {
       const w = box.clientWidth, h = box.clientHeight; if (!w || !h) return;
       renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+      // step back when the space is narrow, so the turning carton always fits (about 3.4 units across)
+      baseZ = Math.max(7.4, 3.4 / (2 * Math.tan(16 * Math.PI / 180) * camera.aspect));
     }
     resize(); new ResizeObserver(resize).observe(box);
 
@@ -238,7 +241,7 @@ JS = """<script>
       step(yaw, ty, dt, 1.25); step(pitch, tp, dt, 1.25);
       rig.rotation.y = yaw.x; rig.rotation.x = pitch.x;
       rig.rotation.z = Math.max(-0.09, Math.min(0.09, -yaw.v * 0.05));
-      rig.position.x = step(rigX, wide() ? -1.42 : 0, dt, 1.1, 1); shadow.position.x = rig.position.x;
+      rig.position.x = step(rigX, 0, dt, 1.1, 1); shadow.position.x = rig.position.x;   // centred in its own space
       eyes.forEach(({pupil}) => { pupil.position.x = (lookX.x - yaw.x * 0.4) * 0.17; pupil.position.y = -(lookY.x - pitch.x * 0.4) * 0.22; });
 
       // mood: worried while the card is Blocked (until ~3.4 s), happy after; the mouth morphs through flat
@@ -300,7 +303,7 @@ JS = """<script>
       const open = b >= 0 && b < 1 ? 1 - 0.9 * Math.sin(b * Math.PI) : 1;
       eyes.forEach(({e}) => { e.scale.y = open; });
       const openNow = k >= 0 && k < INSPECT ? Math.min(ease(seg(1.0, 1.8)), 1 - ease(seg(4.6, 5.5))) : 0;
-      camera.position.z = 7.4 + 1.5 * openNow; camera.position.y = 0.5 + 0.55 * openNow;
+      camera.position.z = baseZ + 1.5 * openNow; camera.position.y = 0.5 + 0.55 * openNow;
       camera.lookAt(0, 0.05 + 0.5 * openNow, 0);
       renderer.render(scene, camera);
     }
