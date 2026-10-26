@@ -12,7 +12,7 @@ import re
 from datetime import date
 from typing import Optional
 
-from core import fmt
+from core import fmt, hs
 from core.dangerous_goods import detect
 from core.models import Booking, CarrierOption, Issue, Item, ITEM_ORIGIN_COUNTRIES
 
@@ -41,7 +41,7 @@ WHY = {
     "R-10": "The collection date has already passed, so the carrier can't collect on that day.",
 }
 TITLES = {
-    "R-01": "HS code missing or too short", "R-02": "Declared value doesn't match items",
+    "R-01": "HS code missing or not valid", "R-02": "Declared value doesn't match items",
     "R-03": "Units per carton × cartons ≠ quantity", "R-04": "Booking cartons ≠ item cartons",
     "R-05": "Pallets too heavy for carrier", "R-06": "Possible dangerous goods",
     "R-07": "Gross weight lighter than the goods", "R-08": "No delivery appointment at warehouse",
@@ -123,17 +123,19 @@ def r01_hs_code(b: Booking) -> list[Issue]:
         elif len(digits) < 6:
             fix = (f"Enter the full HS code (at least 6 digits) for '{it.description or _name(it)}'; "
                    "check it on the UK Trade Tariff (gov.uk/trade-tariff).")
-            action, likely = None, ""
+            hint = ""
             chapter = zero_chapter(digits, it.description) if len(digits) == 5 else None
-            if chapter and it.hs_possible_leading_zero_lost:
-                likely = f" It is almost certainly 0{digits}: Excel drops the leading zero from numbers."
-                fix = (f"Set it to 0{digits} — chapter 0{digits[0]} is {chapter}, which fits "
-                       f"'{it.description}'. Tap the fix, or re-enter the code in Excel as text so the zero stays.")
-                action = {"target": "item", "sku": it.sku, "field": "hs_code", "value": "0" + digits,
-                          "label": f"Set HS code to 0{digits}"}
+            if chapter and it.hs_possible_leading_zero_lost:   # a pointer only: we never set an HS code for you
+                hint = (f" Excel may have dropped a leading zero — if the product is in chapter 0{digits[0]} "
+                        f"({chapter}), the code may be 0{digits}. Check it before you enter it.")
             out.append(_issue("R-01", b, f"{_name(it)} has HS code '{it.hs_code}' with only "
-                                         f"{len(digits)} digits; at least 6 are needed.{likely}",
-                              fix, it.sku, fix_action=action))
+                                         f"{len(digits)} digits; at least 6 are needed.{hint}",
+                              fix, it.sku))
+        elif hs.problem(it.hs_code):
+            out.append(_issue("R-01", b, f"{_name(it)} ({it.description or 'no description'}): "
+                                         f"{hs.problem(it.hs_code)}.",
+                              f"Look up the real HS code for '{it.description or _name(it)}' on the UK Trade "
+                              "Tariff (gov.uk/trade-tariff) and enter it.", it.sku))
     return out
 
 

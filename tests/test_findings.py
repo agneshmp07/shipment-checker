@@ -34,7 +34,7 @@ def test_single_problem_says_what_happens_after():
 
 def test_several_problems_say_where_to_start():
     f = f_for(booking([item(hs_code=None, country_of_origin=None)], delivery_appointment_booked=False))
-    assert f.recommend[0].startswith("Start with “HS code missing or too short” — it stops the shipment")
+    assert f.recommend[0].startswith("Start with “HS code missing or not valid” — it stops the shipment")
     assert "Country of origin missing" in f.recommend[0]
 
 

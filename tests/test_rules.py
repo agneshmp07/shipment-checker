@@ -66,8 +66,19 @@ def test_r01_short_fails_with_digit_count():
 def test_r01_five_digits_lost_zero_hint_when_the_chapter_fits():
     (i,) = rules.r01_hs_code(booking([item(description="Roasted coffee beans, 1 kg bag", hs_code="90121",
                                            hs_possible_leading_zero_lost=True)]))
-    assert i.severity == "Red" and "almost certainly 090121" in i.explanation
-    assert "coffee, tea and spices" in i.fix and i.fix_action["value"] == "090121"
+    assert i.severity == "Red" and "may be 090121" in i.explanation and "coffee, tea and spices" in i.explanation
+    assert i.fix_action is None                          # we never set an HS code for you
+
+
+@pytest.mark.parametrize("code", ["123456", "999999", "000000", "770000", "620000", "12345678901", "12a456"])
+def test_r01_rejects_codes_that_are_not_real(code):
+    (i,) = rules.r01_hs_code(booking([item(hs_code=code)]))
+    assert i.severity == "Red" and i.fix_action is None
+
+
+@pytest.mark.parametrize("code", ["691200", "090121", "8544.42", "6109100010", "940360"])
+def test_r01_accepts_real_codes(code):
+    assert rules.r01_hs_code(booking([item(hs_code=code)])) == []
 
 
 def test_r01_no_zero_hint_when_the_chapter_does_not_fit():

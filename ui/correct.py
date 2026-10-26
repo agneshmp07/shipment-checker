@@ -9,9 +9,9 @@ import streamlit as st
 
 from core import fmt
 from core.check import Evaluation
-from core.diagnosis import apply_fix, diagnose
+from core.diagnosis import apply_fix, high_confidence_actions
 
-CONF_BADGE = {"High": ":green-badge[High confidence]", "Medium": ":blue-badge[Likely]", "Low": ":gray-badge[Check first]"}
+CONF_BADGE = {"High": ":green-badge[Certain]"}
 NAMES = {"total_gross_weight_kg": "gross weight", "total_declared_value": "declared value", "unit_weight_kg": "unit weight",
          "hs_code": "HS code", "units_per_carton": "units per carton", "unit_price": "unit price",
          "delivery_appointment_booked": "delivery slot", "ready_date": "ready date"}
@@ -29,18 +29,14 @@ def _label(action: dict) -> str:
 
 
 def suggestions(ev: Evaluation) -> list[dict]:
-    """The fixes we can make for one booking, in the order to apply them (items before the totals)."""
+    """The fixes we're certain of for one booking (High confidence only), items before the totals.
+
+    Guesses are never offered: anything less than certain, and facts only the seller knows (a booked
+    delivery slot, the ready date, the right HS code), is left for the person to enter."""
     if not ev.issues:
         return []
-    out = []
-    roots, rest = diagnose(ev.booking, ev.issues)
-    for r in roots:
-        if r.fix_action:
-            out.append({"label": r.fix_label or _label(r.fix_action), "conf": r.confidence,
-                        "action": r.fix_action, "why": r.title})
-    for i in rest:
-        if i.fix_action:
-            out.append({"label": _label(i.fix_action), "conf": "Medium", "action": i.fix_action, "why": i.title})
+    out = [{"label": r.fix_label or _label(a), "conf": "High", "action": a, "why": r.title}
+           for r, a in high_confidence_actions(ev.booking, ev.issues)]
     bid = ev.booking.booking_id
     for s in out:                                          # a stable widget key per suggestion
         a = s["action"]

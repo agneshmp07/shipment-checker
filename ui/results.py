@@ -79,9 +79,6 @@ def render_issue(issue, key: str, ev: Optional[Evaluation] = None, on_fix=None, 
         st.write(issue.explanation)
         st.markdown(f"**Why it matters:** {issue.why_it_matters}")
         st.markdown(f"**How to fix:** {issue.fix}")
-        if ev is not None and issue.fix_action:
-            fix_button(ev, issue.fix_action, issue.fix_action.get("label", "Apply fix"), f"{key}-btn",
-                       msg_key, on_fix)
 
 
 def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str], None]] = None,
@@ -109,11 +106,11 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
         } for it in b.items]), hide_index=True)
 
     t_problems, t_carrier, t_confirm, t_invoice, t_buyers = st.tabs(
-        [":material/build: Problems & fixes", ":material/local_shipping: Carrier",
+        [":material/rule: 10-rule check", ":material/local_shipping: Carrier",
          ":material/assignment_turned_in: Confirmation", ":material/receipt_long: Invoice",
          ":material/storefront: Buyers"], key=f"{key}-tabs", on_change="rerun")
 
-    # ---- Problems & fixes ----
+    # ---- 10-rule check: what passed, what broke, and the fixes ----
     with t_problems:
         st.html(rule_chips(scorecard(b, ev.issues)))      # R-01 … R-10: passed, broken or not checked
         if editable and ev.issues:                      # upload page: the same fix window as the pop-up
@@ -131,7 +128,8 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
         for n, rc in enumerate(roots):
             with st.container(border=True):
                 n_fix = len(rc.fixes)
-                head = f"1 root problem → fixes {n_fix} issues" if n_fix > 1 else "Likely cause"
+                sure = rc.confidence == "High"
+                head = (f"1 root problem → fixes {n_fix} issues" if n_fix > 1 else "Root cause") if sure                     else "Possible cause — not certain"
                 st.markdown(f":violet-badge[{head}] :{CONFIDENCE_COLOUR[rc.confidence]}-badge[{rc.confidence} "
                             f"confidence] **{rc.title}**")
                 st.write(rc.explanation)
@@ -139,7 +137,11 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
                 with st.expander("Explains: " + " · ".join(i.title for i in explained)):
                     for m, issue in enumerate(explained):
                         render_issue(issue, f"{key}-root{n}-{m}")
-                fix_button(ev, rc.fix_action, rc.fix_label, f"{key}-root-{n}-btn", key, on_fix)
+                if sure:                                # only certain fixes get a button
+                    fix_button(ev, rc.fix_action, rc.fix_label, f"{key}-root-{n}-btn", key, on_fix)
+                else:
+                    st.caption(":material/front_hand: We're not sure enough to change this for you — "
+                               "check it and enter the right value yourself.")
         for n, issue in enumerate(remaining):
             render_issue(issue, f"{key}-issue-{n}", ev, on_fix, msg_key=key)
         flagged_dg = {i.item_sku for i in ev.issues if i.rule_id == "R-06"}

@@ -13,7 +13,7 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
-from core import fmt
+from core import fmt, hs
 from core.check import Evaluation, evaluate
 from core.diagnosis import apply_fix
 from core.models import ITEM_ORIGIN_COUNTRIES, PRIORITIES
@@ -62,6 +62,38 @@ def _needed(ev: Evaluation, everything: bool) -> tuple[list[str], list[str], set
     return bf, itf, skus
 
 
+WHOLE = ("quantity", "units_per_carton", "cartons", "pallets")          # counted: whole numbers above 0
+POSITIVE = ("unit_price", "unit_weight_kg", "total_declared_value", "total_gross_weight_kg")
+
+
+def _invalid(booking_vals: dict, item_rows: list) -> list[str]:
+    """Plain-English reasons the entered values can't be accepted (empty list = all fine)."""
+    errors = []
+
+    def check(field, v, where=""):
+        name = correct.NAMES.get(field, field.replace("_", " "))
+        if field == "hs_code":
+            why = hs.problem(v)
+            if why:
+                errors.append(f"HS code{where}: {why}. Look it up on the UK Trade Tariff (gov.uk/trade-tariff).")
+        elif field in WHOLE + POSITIVE:
+            if v is None:
+                errors.append(f"{name.capitalize()}{where} is empty.")
+            elif v <= 0:
+                errors.append(f"{name.capitalize()}{where} must be more than 0.")
+            elif field in WHOLE and v != int(v):
+                errors.append(f"{name.capitalize()}{where} must be a whole number.")
+        elif field == "country_of_origin" and not v:
+            errors.append(f"Made in{where} is empty.")
+
+    for f, v in booking_vals.items():
+        check(f, v)
+    for it, row in item_rows:
+        for f, v in row.items():
+            check(f, v, f" for {it.sku}")
+    return errors
+
+
 def _editor(ev: Evaluation, everything: bool) -> list[str]:
     """The 'change it yourself' form. Returns change messages after Save (else [])."""
     b = ev.booking
@@ -96,7 +128,8 @@ def _editor(ev: Evaluation, everything: bool) -> list[str]:
                 row = {"SKU": it.sku}
                 if "description" not in itf:
                     row["Item"] = it.description
-                row.update({ITEM_COLS[f]: getattr(it, f) for f in itf})
+                row.update({ITEM_COLS[f]: "" if getattr(it, f) is None and f in ("hs_code", "description") else getattr(it, f)
+                            for f in itf})
                 if removable:
                     row["Remove from shipment"] = False
                 rows.append(row)
@@ -107,6 +140,24 @@ def _editor(ev: Evaluation, everything: bool) -> list[str]:
         saved = st.form_submit_button("Save & re-check", type="primary", icon=":material/save:")
     if not saved:
         return []
+
+    # read everything first, check it, and only then change the booking: a bad value is never saved
+    new_b = {f: _num(v) if f in ("pallets", "cartons", "total_declared_value", "total_gross_weight_kg") else v
+             for f, v in vals.items()}
+    new_items, removed = [], []
+    if table is not None:
+        for it, (_, row) in zip(items, table.iterrows()):
+            if removable and bool(row.get("Remove from shipment")):
+                removed.append(it)
+                continue
+            new_items.append((it, {f: _num(row[ITEM_COLS[f]]) if f in WHOLE + POSITIVE else _txt(row[ITEM_COLS[f]])
+                                   for f in itf}))
+    errors = _invalid(new_b, new_items)
+    if errors:
+        st.error("**Not saved — please correct these first:**\n" + "\n".join(f"- {e}" for e in errors),
+                 icon=":material/block:")
+        return []
+
     msgs = []
 
     def put(obj, field, new, where=""):
@@ -117,20 +168,16 @@ def _editor(ev: Evaluation, everything: bool) -> list[str]:
                                                      fmt.num(v) if isinstance(v, float) else str(v))
             msgs.append(f"{correct.NAMES.get(field, field.replace('_', ' '))}{where}: {shown(old)} → {shown(new)} (manual)")
 
-    for f, v in vals.items():
-        put(b, f, _num(v) if f in ("pallets", "cartons", "total_declared_value", "total_gross_weight_kg") else v)
-    if table is not None:
-        for it, (_, row) in zip(items, table.iterrows()):
-            if removable and bool(row.get("Remove from shipment")):
-                b.items.remove(it)
-                msgs.append(f"removed {it.sku} ({it.description or 'item'}) from the shipment (manual)")
-                continue
-            for f in itf:
-                v = row[ITEM_COLS[f]]
-                new = _num(v) if f in ("quantity", "unit_price", "units_per_carton", "cartons", "unit_weight_kg") else _txt(v)
-                if f == "hs_code" and new != it.hs_code:
-                    it.hs_possible_leading_zero_lost = False
-                put(it, f, new, f" for {it.sku}")
+    for f, v in new_b.items():
+        put(b, f, v)
+    for it in removed:
+        b.items.remove(it)
+        msgs.append(f"removed {it.sku} ({it.description or 'item'}) from the shipment (manual)")
+    for it, row in new_items:
+        for f, new in row.items():
+            if f == "hs_code" and new != it.hs_code:
+                it.hs_possible_leading_zero_lost = False
+            put(it, f, new, f" for {it.sku}")
     return msgs
 
 
@@ -167,6 +214,8 @@ def fix_dialog(booking_id: str):
         picks = correct.suggestions(ev)
         with st.container(border=True):
             st.markdown("#### :material/auto_fix_high: Let us fix it")
+            st.caption("We only change something when the numbers prove what's right. "
+                       "Anything we're not sure of is left for you below.")
             if picks:
                 for s in picks:
                     st.session_state.setdefault(s["key"], s["conf"] == "High")
@@ -179,12 +228,15 @@ def fix_dialog(booking_id: str):
                     open_fix(booking_id)                       # re-check, keep this window open
                     st.rerun()
             else:
-                st.caption("We can't fix this one automatically — it needs information only you have. "
-                           "Change it below.")
+                st.caption(":material/front_hand: Nothing here we can be certain of — this needs information "
+                           "only you have (like the real HS code or a booked delivery slot). Enter it below; "
+                           "we'll check it before saving.")
 
         # ---- 2. Or change it yourself
         with st.container(border=True):
             st.markdown("#### :material/edit: Or change it yourself")
+            st.caption("Every value is checked before it's saved — anything invalid (like a made-up HS code) "
+                       "is refused with the reason.")
             everything = st.toggle("Show every field", key=f"fix-all-fields-{booking_id}")
             if not everything:
                 st.caption("Only the fields behind the problems are shown.")

@@ -125,3 +125,24 @@ def test_fix_window_change_it_yourself_shows_only_the_fields_needed(tmp_path, mo
     assert not at.exception
     assert any("(manual)" in m for m in at.session_state["fix_all_result"]["changed"][bk.booking_id])
     assert any("now passes all 10 checks" in s.value for s in at.success)
+
+
+def test_fix_window_refuses_values_that_fail_the_checks():
+    from ui.fixflow import _invalid
+    it = item()
+    errors = _invalid({"cartons": 0.0, "total_declared_value": None},
+                      [(it, {"hs_code": "123456", "quantity": 2.5, "unit_price": -1.0})])
+    text = " ".join(errors)
+    assert "isn't a real HS code" in text and "heading 1234" in text
+    assert "Cartons must be more than 0" in text and "Declared value is empty" in text
+    assert "must be a whole number" in text and "Unit price for" in text
+    assert _invalid({"cartons": 80.0}, [(it, {"hs_code": "691200", "quantity": 100.0})]) == []
+
+
+def test_only_certain_fixes_are_offered(tmp_path, monkeypatch):
+    from ui.correct import suggestions
+    at = _upload_page(tmp_path, monkeypatch)
+    for b in at.session_state["upload_bookings"]:
+        for s in suggestions(evaluate(b, STANDIN_CARRIERS, date.today())):
+            assert s["conf"] == "High"
+            assert s["action"]["field"] not in ("hs_code", "delivery_appointment_booked", "ready_date")
