@@ -117,18 +117,17 @@ def test_r07_gross_weight_estimate_with_fix():
     b = booking(total_gross_weight_kg=400)               # goods 1,080 × 0.5 = 540 kg, 3 pallets
     issues, roots, remaining = run(b)
     (rc,) = roots
-    assert rc.title == "Most likely the gross weight is too low: it should be at least 615 kg, not 400 kg"
+    assert rc.title == ("Most likely the gross weight is too low: raise it to at least 615 kg plus packaging, "
+                        "not 400 kg")
     assert "540 kg goods + 3 × 25 kg empty pallets" in rc.explanation and "re-weigh" in rc.fix_label
     assert remaining == []
     apply_fix(b, rc.fix_action)
     assert rules.run_rules(b, STANDIN_CARRIERS, TODAY) == []
 
 
-def test_r07_unit_weight_extra_zero():
+def test_r07_never_shrinks_a_products_weight():
     b = booking([item(unit_weight_kg=5.0)])              # 1,080 × 5 kg = 5,400 kg > 620 kg gross
     _, roots, _ = run(b)
     (rc,) = roots
-    assert rc.title == "Most likely typo: unit weight for MUG-01 should be 0.5 kg, not 5 kg"
-    assert rc.confidence == "High"
-    apply_fix(b, rc.fix_action)
-    assert rules.run_rules(b, STANDIN_CARRIERS, TODAY) == []
+    assert rc.fix_action["field"] == "total_gross_weight_kg" and rc.fix_action["value"] >= 5400
+    assert "raise it to at least" in rc.title and "plus packaging" in rc.title

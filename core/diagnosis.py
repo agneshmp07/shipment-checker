@@ -176,8 +176,10 @@ def _diag_r02(b: Booking) -> Optional[RootCause]:
         return None
     packing_ok = _passes(rules.r03_carton_maths, b)
     cands = []
-    # Candidate: the declared total is the wrong number
-    why, score = [], 0.0
+    # Candidate: the declared total is the wrong number. It is worked out from the items, so it is
+    # the safest number to correct; changing a unit price changes what the buyer pays.
+    why, score = ["the declared value is a total worked out from the items, so it is the safest number to "
+                  "correct"], 1.0
     if packing_ok:
         score += 1.5
         why.append("every item's packing maths (units per carton × cartons) adds up, so the quantities look right")
@@ -200,7 +202,8 @@ def _diag_r02(b: Booking) -> Optional[RootCause]:
                 if round(p2 * 100) % 50 == 0 or round(p2 * 100) % 100 in (95, 99):
                     s += 1
                     w.append(f"{fmt.money(p2)} is a typical price point")
-                t = looks_like_typo(it.unit_price, p2)
+                # any two single-digit prices differ by "one digit", so that is no evidence of a typo
+                t = looks_like_typo(it.unit_price, p2) if max(it.unit_price, p2) >= 10 else None
                 if t:
                     s += 1.5
                     w.append(f"{fmt.money(it.unit_price)} vs {fmt.money(p2)} looks like {t}")
@@ -269,27 +272,9 @@ def _diag_r07(b: Booking) -> Optional[RootCause]:
     goods, gross = rules.goods_weight(b), b.total_gross_weight_kg
     if goods is None or gross is None:
         return None
+    # A low gross weight is fixed by re-weighing, never by shrinking a product's weight:
+    # a seller's unit weight is a fact about the product, and a smaller one hides the problem.
     cands = []
-    # Candidate: one item's unit weight has an extra zero / wrong digit
-    for it in b.items:
-        name = it.sku or it.description or "item"
-        for factor in (10, 100):
-            w2 = round(it.unit_weight_kg / factor, 6)
-            if gross + 1e-9 < goods - (it.unit_weight_kg - w2) * it.quantity:
-                continue                            # still too heavy: skip the costly simulation
-            action = {"target": "item", "sku": it.sku, "field": "unit_weight_kg", "value": w2}
-            sim = _with(b, action)
-            if _passes(rules.r07_gross_weight, sim):
-                plausible = _plausible_packaging(sim)
-                score = 3.0 if plausible else 1.0
-                why = [f"{fmt.kg(it.unit_weight_kg)} vs {fmt.kg(w2)} looks like an extra zero",
-                       f"with {fmt.kg(w2)} per unit the goods weigh {fmt.kg(rules.goods_weight(sim))}, "
-                       f"{'a believable' if plausible else 'a possible'} fit for the declared "
-                       f"{fmt.kg(gross)} gross"]
-                cands.append((score, f"Most likely typo: unit weight for {name} should be {fmt.kg(w2)}, "
-                                     f"not {fmt.kg(it.unit_weight_kg)}", why, action,
-                              f"Set unit weight for {name} to {fmt.kg(w2)}"))
-                break
     # Candidate: the gross weight itself is too low -> estimate it
     pallets = int(b.pallets) if b.pallets and b.pallets > 0 else 0
     estimate = round(goods + EMPTY_PALLET_KG * pallets)
@@ -301,12 +286,10 @@ def _diag_r07(b: Booking) -> Optional[RootCause]:
     typo = looks_like_typo(gross, estimate)
     if typo:
         why.append(f"{fmt.kg(gross)} vs about {fmt.kg(estimate)} may be {typo}")
-    if gross and estimate / gross > 3:
-        score -= 1.5          # a gap this big is more likely a unit-weight typo than a weighing error
     est_txt = (f"{fmt.kg(goods)} goods + {pallets} × {EMPTY_PALLET_KG} kg empty pallets" if pallets
                else f"{fmt.kg(goods)} goods")
-    cands.append((score, f"Most likely the gross weight is too low: it should be at least {fmt.kg(estimate)}, "
-                         f"not {fmt.kg(gross)}", why,
+    cands.append((score, f"Most likely the gross weight is too low: raise it to at least {fmt.kg(estimate)} "
+                         f"plus packaging, not {fmt.kg(gross)}", why,
                   {"target": "booking", "field": "total_gross_weight_kg", "value": float(estimate),
                    "label": "estimate"},
                   f"Use estimated gross weight {fmt.kg(estimate)} (re-weigh to confirm)"))

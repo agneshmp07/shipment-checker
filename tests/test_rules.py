@@ -63,9 +63,18 @@ def test_r01_short_fails_with_digit_count():
     assert "only 4 digits" in i.explanation
 
 
-def test_r01_five_digits_lost_zero_hint():
-    (i,) = rules.r01_hs_code(booking([item(hs_code="90111", hs_possible_leading_zero_lost=True)]))
-    assert i.severity == "Red" and "090111" in i.fix and i.fix_action["value"] == "090111"
+def test_r01_five_digits_lost_zero_hint_when_the_chapter_fits():
+    (i,) = rules.r01_hs_code(booking([item(description="Roasted coffee beans, 1 kg bag", hs_code="90121",
+                                           hs_possible_leading_zero_lost=True)]))
+    assert i.severity == "Red" and "almost certainly 090121" in i.explanation
+    assert "coffee, tea and spices" in i.fix and i.fix_action["value"] == "090121"
+
+
+def test_r01_no_zero_hint_when_the_chapter_does_not_fit():
+    (i,) = rules.r01_hs_code(booking([item(description="USB-C charging cable, 1 m", hs_code="85444",
+                                           hs_possible_leading_zero_lost=True)]))
+    assert i.severity == "Red" and "085444" not in i.fix and i.fix_action is None
+    assert "too short" not in i.fix and "at least 6 digits" in i.fix
 
 
 # R-02 ------------------------------------------------------------------------

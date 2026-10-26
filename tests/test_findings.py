@@ -61,3 +61,10 @@ def test_popup_opens_after_upload_and_open_selects_booking(tmp_path, monkeypatch
     assert not at.exception and at.session_state["focus_booking"] == "BK-107"
     banners = [h.proto.body for h in at.get("html") if 'class="sc-banner' in h.proto.body]
     assert banners and ">BK-107" in banners[0]
+
+
+def test_repeated_problem_is_one_line():
+    b = booking([item(hs_code=None), item(sku="MUG-02", hs_code="6912")],
+                cartons=180, total_declared_value=10800, total_gross_weight_kg=1300, pallets=3)
+    f = f_for(b)
+    assert f.recommend == ["Fix the 2 HS codes — it stops the shipment. Then the booking is ready to ship."]

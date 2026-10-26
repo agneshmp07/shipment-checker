@@ -76,6 +76,41 @@ def _all_known(items: list[Item], *fields: str) -> bool:
 # ---- Rules -----------------------------------------------------------------
 
 
+BOUNDARY = chr(92) + "b"          # regex word boundary
+
+# HS chapters 01-09 are the only ones that start with 0, so Excel can only drop a leading zero from
+# these. Suggest the zero only when the product plausibly belongs to that chapter.
+ZERO_CHAPTERS = {
+    "01": ("live animals", "live animal|horse|cattle|cow|sheep|goat|pig|chicken|poultry"),
+    "02": ("meat", "meat|beef|pork|lamb|mutton|venison|veal"),
+    "03": ("fish and seafood", "fish|salmon|tuna|cod|prawn|shrimp|crab|lobster|seafood|mussel|oyster"),
+    "04": ("dairy, eggs and honey", "milk|cream|butter|cheese|yogh?urt|egg|honey|dairy"),
+    "05": ("other animal products", "feather|bone|horn|animal hair"),
+    "06": ("plants and flowers", "plant|flower|bulb|tree|bouquet|foliage|seedling"),
+    "07": ("vegetables", "vegetable|potato|tomato|onion|garlic|carrot|lettuce|cabbage|bean|pea|lentil|mushroom"),
+    "08": ("fruit and nuts", "fruit|nut|apple|banana|orange|lemon|grape|berry|berries|almond|cashew|walnut|"
+                             "date|fig|coconut|mango"),
+    "09": ("coffee, tea and spices", "coffee|tea|spice|pepper|vanilla|cinnamon|clove|nutmeg|ginger|turmeric|"
+                                     "saffron|cardamom|cumin"),
+}
+
+
+# Words that make it equipment, a container or a processed product, not the raw goods (a coffee mug is chapter 69)
+NOT_RAW_GOODS = ("mug|cup|maker|machine|grinder|kettle|press|filter|spoon|bowl|plate|glass|vase|jar|pot|"
+                 "candle|soap|print|poster|book|card|toy|cable|case|juice|jam|sauce|perfume|scent")
+
+
+def zero_chapter(digits: str, description: Optional[str]) -> Optional[str]:
+    """The chapter name if '0' + digits fits the product (e.g. 90121 + 'coffee beans' -> coffee...)."""
+    chapter = ZERO_CHAPTERS.get("0" + digits[:1])
+    text = (description or "").lower()
+    if re.search(BOUNDARY + "(" + NOT_RAW_GOODS + ")s?" + BOUNDARY, text):
+        return None
+    if chapter and re.search(r"\b(" + chapter[1] + r")s?\b", (description or "").lower()):
+        return chapter[0]
+    return None
+
+
 def r01_hs_code(b: Booking) -> list[Issue]:
     out = []
     for it in b.items:
@@ -88,13 +123,16 @@ def r01_hs_code(b: Booking) -> list[Issue]:
         elif len(digits) < 6:
             fix = (f"Enter the full HS code (at least 6 digits) for '{it.description or _name(it)}'; "
                    "check it on the UK Trade Tariff (gov.uk/trade-tariff).")
-            action = None
-            if len(digits) == 5 and it.hs_possible_leading_zero_lost:
-                fix = (f"This looks like a 6-digit code that lost its leading zero in Excel "
-                       f"(e.g. 0{digits}). Check and re-enter it as text.")
-                action = {"target": "item", "sku": it.sku, "field": "hs_code", "value": "0" + digits}
+            action, likely = None, ""
+            chapter = zero_chapter(digits, it.description) if len(digits) == 5 else None
+            if chapter and it.hs_possible_leading_zero_lost:
+                likely = f" It is almost certainly 0{digits}: Excel drops the leading zero from numbers."
+                fix = (f"Set it to 0{digits} — chapter 0{digits[0]} is {chapter}, which fits "
+                       f"'{it.description}'. Tap the fix, or re-enter the code in Excel as text so the zero stays.")
+                action = {"target": "item", "sku": it.sku, "field": "hs_code", "value": "0" + digits,
+                          "label": f"Set HS code to 0{digits}"}
             out.append(_issue("R-01", b, f"{_name(it)} has HS code '{it.hs_code}' with only "
-                                         f"{len(digits)} digits; at least 6 are needed.",
+                                         f"{len(digits)} digits; at least 6 are needed.{likely}",
                               fix, it.sku, fix_action=action))
     return out
 
