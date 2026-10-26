@@ -12,7 +12,7 @@ def render_invoice(ev: Evaluation, key: str):
     store = f"invoice-details-{b.booking_id}"
     d: InvoiceDetails = st.session_state.get(store) or InvoiceDetails()
 
-    st.caption("Customs relies on this document. ShipCheck fills in everything from your booking — items, "
+    st.caption("Customs relies on this document. Oops-Proof fills in everything from your booking — items, "
                "HS codes, origin, values, weights, cartons, route and freight. Add the details only you know.")
     with st.expander("Add buyer, terms and your details", icon=":material/edit_document:",
                      expanded=st.session_state.get(f"{key}-inv-open", False)):

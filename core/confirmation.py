@@ -68,7 +68,7 @@ def next_steps(b: Booking, rec: Recommendation, issues: list[Issue]) -> list[dic
     steps.append({"step": "Prepare the commercial invoice", "state": "todo",
                   "detail": "The document customs relies on: every item with its description, HS code, "
                             f"country of origin, quantity and value — total {fmt.money(b.total_declared_value)}. "
-                            "ShipCheck drafts it for you below (PDF or Excel)."})
+                            "Oops-Proof drafts it for you below (PDF or Excel)."})
     if rec.winner:
         c = rec.winner.option
         steps.append({"step": "Collection", "state": "todo",

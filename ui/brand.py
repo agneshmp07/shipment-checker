@@ -1,4 +1,4 @@
-"""ShipCheck look and feel: hero banner, step cards and the per-page "How to use" guide.
+"""Oops-Proof look and feel: hero banner, step cards and the per-page "How to use" guide.
 
 Custom HTML is used only where Streamlit has no native element (the hero banner and
 the numbered step cards). Class names are prefixed "sc-" so the CSS can't leak.
@@ -79,7 +79,7 @@ def page_title(title: str, subtitle: str):
 
 
 GLOBAL_CSS = """<style>
-/* hide the hosting toolbar (Fork / GitHub / developer menu): not part of ShipCheck */
+/* hide the hosting toolbar (Fork / GitHub / developer menu): not part of Oops-Proof */
 [data-testid='stToolbarActions'],[data-testid='stMainMenu']{display:none !important}
 /* buttons lift slightly on hover */
 [data-testid='stBaseButton-primary'],[data-testid='stBaseButton-secondary'],[data-testid='stPopoverButton']

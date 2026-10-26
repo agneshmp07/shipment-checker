@@ -4,7 +4,7 @@ from ui.brand import hero, steps
 
 hero(
     kicker="Pre-flight check · UK → Germany · France · Netherlands",
-    title_html="Ship to Europe <span>without surprises</span>",
+    title_html="Every shipment has an oops. <span>We catch it before customs does.</span>",
     subtitle="Book your shipment by chat, voice or Excel. Before it leaves, we run a pre-flight check against "
              "10 customs and warehouse rules — so your goods aren't held at customs or reported missing at "
              "the warehouse — show you exactly how to fix any mistake, and pick the best carrier.",
@@ -43,7 +43,7 @@ steps([
                  "plain-English confirmation and next steps."),
 ])
 
-st.markdown("#### Everything in ShipCheck")
+st.markdown("#### Everything in Oops-Proof")
 cards = [
     (":material/chat:", "Book by chat or voice", "Describe your shipment in your own words or tap the mic. "
      "The assistant asks only for what's missing and updates the checks as you change things.",
@@ -71,7 +71,7 @@ for n, (icon, title, text, page, link) in enumerate(cards):
 st.markdown("#### Key terms")
 st.table({
     "Commercial invoice": "The document listing what's in the shipment, how many and what it's worth. Customs "
-                          "relies on it — ShipCheck drafts it for you.",
+                          "relies on it — Oops-Proof drafts it for you.",
     "HS code": "The international code that classifies each product for customs (at least 6 digits).",
     "Declared value": "The total value of the goods as stated on the paperwork.",
     "Carton / pallet": "A carton is a box of units; a pallet is the platform holding many cartons.",

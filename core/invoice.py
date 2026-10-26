@@ -3,7 +3,7 @@
 Follows the UK government's export-invoice guide: invoice number and date, seller and buyer
 (and consignee), related paperwork, unit price / currency / payment / discounts, weights and
 number of goods, HS codes, incoterms, package marks, country of origin, transport route,
-total value, additional charges, and a declaration. Everything ShipCheck knows is filled in
+total value, additional charges, and a declaration. Everything Oops-Proof knows is filled in
 from the booking; what only the seller knows comes from a short form and is otherwise
 marked TO COMPLETE.
 """
@@ -246,7 +246,7 @@ def invoice_pdf(inv: Invoice) -> bytes:
     pdf.ln(4)
     pdf.set_font("Helvetica", "I", 7.5)
     pdf.set_text_color(*grey)
-    pdf.multi_cell(0, 4, "Draft prepared by ShipCheck from the booking. Check every detail before use; some "
+    pdf.multi_cell(0, 4, "Draft prepared by Oops-Proof from the booking. Check every detail before use; some "
                    "markets need the invoice in the buyer's language or certified by a chamber of commerce.")
     return bytes(pdf.output())
 

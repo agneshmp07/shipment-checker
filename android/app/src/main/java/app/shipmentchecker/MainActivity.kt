@@ -82,7 +82,7 @@ class MainActivity : ComponentActivity() {
                 val host = request.origin.host ?: ""
                 val wantsMic = PermissionRequest.RESOURCE_AUDIO_CAPTURE in request.resources
                 if (!wantsMic || !(host.endsWith("streamlit.app") || host.endsWith("streamlit.io"))) {
-                    request.deny()                     // only the ShipCheck site, and only the microphone
+                    request.deny()                     // only the Oops-Proof site, and only the microphone
                     return
                 }
                 runOnUiThread {
@@ -153,7 +153,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         // Streamlit Community Cloud adds a "Hosted with Streamlit" link and the creator's avatar
-        // around the app. They aren't part of ShipCheck, so the phone app hides them.
+        // around the app. They aren't part of Oops-Proof, so the phone app hides them.
         private const val HIDE_HOSTING_BADGES = """
             (function () {
               if (document.getElementById('shipcheck-hide-badges')) return;

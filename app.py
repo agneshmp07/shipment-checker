@@ -14,7 +14,7 @@ for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "GEMINI_API_KEY", "GOOGLE_A
     except Exception:  # no secrets file at all: fine, the app runs without the LLM
         pass
 
-st.set_page_config(page_title="ShipCheck — shipment pre-flight checker", page_icon=":material/local_shipping:",
+st.set_page_config(page_title="Oops-Proof — catch shipment mistakes before customs does", page_icon=":material/local_shipping:",
                    layout="wide")
 st.logo("assets/logo.svg", size="large")
 global_style()        # hides the hosting toolbar, adds hover effects

@@ -91,14 +91,14 @@ with st.container(horizontal=True):
                  icon=":material/report:", help="What's wrong in each booking, what to fix, and our recommendation."):
         st.session_state.show_findings = True
     st.button("Fix all high-confidence mistakes", icon=":material/auto_fix_high:",
-              on_click=_fix_all, help="Applies only the fixes ShipCheck is highly confident about. Guesses and "
+              on_click=_fix_all, help="Applies only the fixes Oops-Proof is highly confident about. Guesses and "
               "things only you can decide (an HS code, booking a delivery slot) are left for you.")
     st.download_button("Download corrected file", lambda: corrected_workbook(original, bookings)[0],
                        file_name=f"{Path(st.session_state.upload_name).stem}_corrected.xlsx",
                        icon=":material/download:", disabled=not changes,
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                        help="Your file with every fix applied, changed cells highlighted in yellow, and a "
-                            "'ShipCheck changes' sheet listing what changed.")
+                            "'Oops-Proof changes' sheet listing what changed.")
 if st.session_state.pop("show_findings", False):
     findings_dialog(evals, _fix_all)
 

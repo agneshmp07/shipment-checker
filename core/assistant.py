@@ -15,7 +15,7 @@ from core.check import Evaluation
 from core.diagnosis import diagnose
 from core.rules import RULE_NAMES, TITLES
 
-APP_GUIDE = """ShipCheck helps UK sellers ship goods to Germany, France or the Netherlands.
+APP_GUIDE = """Oops-Proof helps UK sellers ship goods to Germany, France or the Netherlands.
 Pages:
 - Home: overview, a one-tap demo, example sentences.
 - Book by chat (or voice): describe a shipment in plain English (or tap the mic); the app asks only for
@@ -38,7 +38,7 @@ Customs hold = customs stops goods until paperwork is fixed. Delivery appointmen
 the receiving warehouse. Declared value = total value of the goods on the paperwork. Commercial invoice =
 the document listing what is shipped, how many and its value; customs relies on it."""
 
-SYSTEM = f"""You are the ShipCheck assistant inside a shipment-booking app. Answer the user's question
+SYSTEM = f"""You are the Oops-Proof assistant inside a shipment-booking app. Answer the user's question
 in plain English, in at most 120 words, using bullet points only when listing several items.
 
 Rules:

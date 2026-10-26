@@ -47,8 +47,8 @@ def _pick_suggestion():
 def render_ask_ai(page: str):
     with st.container(horizontal=True, horizontal_alignment="right"):
         with st.popover("Ask AI", icon=":material/auto_awesome:", type="primary", key="ask_ai_popover"):
-            st.markdown("**ShipCheck assistant**")
-            st.caption("Ask me anything about your shipment, a booking on screen, or how to use ShipCheck.")
+            st.markdown("**Oops-Proof assistant**")
+            st.caption("Ask me anything about your shipment, a booking on screen, or how to use Oops-Proof.")
             pending = st.session_state.pop("ai_pending", None)
             with st.form("ask_ai_form", clear_on_submit=True, border=False):
                 q = st.text_input("Your question", placeholder="e.g. Why is BK-107 blocked?",

@@ -64,7 +64,7 @@ def test_corrected_file_round_trip_and_highlights():
     again = {b.booking_id: ev(b).status for b in load_workbook(data).bookings}
     assert again["BK-105"] == again["BK-106"] == again["BK-107"] == again["BK-108"] == "Ready"
     wb = openpyxl.load_workbook(io.BytesIO(data))
-    assert "ShipCheck changes" in wb.sheetnames and "Carrier options" in wb.sheetnames
+    assert "Oops-Proof changes" in wb.sheetnames and "Carrier options" in wb.sheetnames
     hs = next(c for row in wb["Items"].iter_rows() for c in row if c.value == "090111")
     assert hs.fill.start_color.rgb.endswith("FFF2CC") and "90111" in hs.comment.text
 
@@ -73,7 +73,7 @@ def test_no_changes_means_nothing_to_download():
     build()
     raw = OUT.read_bytes()
     data, changes = corrected_workbook(raw, load_workbook(raw).bookings)
-    assert changes == [] and "ShipCheck changes" not in openpyxl.load_workbook(io.BytesIO(data)).sheetnames
+    assert changes == [] and "Oops-Proof changes" not in openpyxl.load_workbook(io.BytesIO(data)).sheetnames
 
 
 def test_upload_page_fix_all_button(tmp_path, monkeypatch):

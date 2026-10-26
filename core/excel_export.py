@@ -2,7 +2,7 @@
 
 Only cells whose value changed (by "Fix all" or a fix button) are rewritten; everything
 else in the workbook, including the fixed sheets and formatting, is left as uploaded.
-Changed cells are highlighted with a note saying what they were, and a "ShipCheck
+Changed cells are highlighted with a note saying what they were, and a "Oops-Proof
 changes" sheet lists every change.
 """
 from __future__ import annotations
@@ -88,8 +88,8 @@ def corrected_workbook(original: bytes, bookings: list[Booking]) -> tuple[bytes,
         if field == "hs_code":
             cell.number_format = "@"            # keep leading zeros as typed
         cell.fill = CHANGED
-        cell.comment = Comment(f"ShipCheck changed this from {_shown(field, old)} to {_shown(field, new)}.",
-                               "ShipCheck")
+        cell.comment = Comment(f"Oops-Proof changed this from {_shown(field, old)} to {_shown(field, new)}.",
+                               "Oops-Proof")
         changes.append({"Booking": booking_id, "SKU": sku or "", "Sheet": sheet, "Row": row,
                         "Field": LABELS.get(field, field.replace("_", " ").capitalize()),
                         "Was": _shown(field, old), "Now": _shown(field, new)})
@@ -110,8 +110,8 @@ def corrected_workbook(original: bytes, bookings: list[Booking]) -> tuple[bytes,
                     write(ws_i, cols_i, it.source_row, f, getattr(oi, f), getattr(it, f), b.booking_id, it.sku, "Items")
 
     if changes:
-        log = wb.create_sheet("ShipCheck changes")
-        log.append(["Changes made by ShipCheck — highlighted in yellow on the Bookings and Items sheets"])
+        log = wb.create_sheet("Oops-Proof changes")
+        log.append(["Changes made by Oops-Proof — highlighted in yellow on the Bookings and Items sheets"])
         log["A1"].font = Font(bold=True)
         headers = list(changes[0])
         log.append(headers)
