@@ -33,15 +33,17 @@ _CSS = """
 .sc-num{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:99px;
   background:#F2690F;color:#fff;font-weight:800;font-size:.9rem;flex:none}
 .sc-step span{color:#B9C8DC;font-size:.92rem;line-height:1.45}
-/* motion: hero fades in, truck drives in then idles, cards rise one after another */
-@keyframes scFadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-@keyframes scDrive{0%{opacity:0;transform:translateX(-70px)}70%{opacity:1;transform:translateX(6px)}100%{opacity:1;transform:none}}
-@keyframes scIdle{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
-.sc-hero{animation:scFadeUp .6s ease-out both}
-.sc-truck{animation:scDrive 1.1s cubic-bezier(.2,.8,.2,1) .25s both,scIdle 3.2s ease-in-out 1.5s infinite}
-.sc-step{animation:scFadeUp .5s ease-out both;transition:transform .2s,border-color .2s,box-shadow .2s}
-.sc-step:nth-child(2){animation-delay:.1s}.sc-step:nth-child(3){animation-delay:.2s}
-.sc-step:hover{transform:translateY(-3px);border-color:#F2690F;box-shadow:0 12px 26px rgba(0,0,0,.28)}
+/* motion: one calm entrance (keyframes live in GLOBAL_CSS), no loops. Lines of the hero glide in
+   one after another, the truck drives in once and parks, then the step cards follow. */
+.sc-hero{animation:scFade .8s ease-out both}
+.sc-hero-text>*{animation:scFadeUp .9s cubic-bezier(.22,1,.36,1) both}
+.sc-hero-text>*:nth-child(1){animation-delay:.1s}.sc-hero-text>*:nth-child(2){animation-delay:.2s}
+.sc-hero-text>*:nth-child(3){animation-delay:.3s}.sc-hero-text>*:nth-child(4){animation-delay:.4s}
+.sc-truck{animation:scDrive 1.5s cubic-bezier(.22,1,.36,1) .35s both}
+.sc-step{animation:scFadeUp .8s cubic-bezier(.22,1,.36,1) .5s both;
+  transition:transform .35s cubic-bezier(.22,1,.36,1),border-color .35s,box-shadow .35s}
+.sc-step:nth-child(2){animation-delay:.6s}.sc-step:nth-child(3){animation-delay:.7s}
+.sc-step:hover{transform:translateY(-4px);border-color:#F2690F;box-shadow:0 16px 32px rgba(0,0,0,.3)}
 @media (prefers-reduced-motion:reduce){.sc-hero,.sc-truck,.sc-step,.sc-banner,.sc-carrier{animation:none!important;transition:none!important}}
 </style>
 """
@@ -83,13 +85,20 @@ GLOBAL_CSS = """<style>
 [data-testid='stToolbarActions'],[data-testid='stMainMenu']{display:none !important}
 /* buttons lift slightly on hover */
 [data-testid='stBaseButton-primary'],[data-testid='stBaseButton-secondary'],[data-testid='stPopoverButton']
-  {transition:transform .15s ease,box-shadow .15s ease}
+  {transition:transform .3s cubic-bezier(.22,1,.36,1),box-shadow .3s cubic-bezier(.22,1,.36,1)}
 [data-testid='stBaseButton-primary']:hover,[data-testid='stPopoverButton']:hover
   {transform:translateY(-1px);box-shadow:0 8px 20px rgba(242,105,15,.35)}
 [data-testid='stBaseButton-secondary']:hover{transform:translateY(-1px)}
 [data-testid='stExpander'] details{transition:border-color .2s}
 [data-testid='stExpander'] details:hover{border-color:#F2690F}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* shared motion: a soft rise that sharpens from a slight blur, on an ease-out curve that settles */
+@keyframes scFadeUp{from{opacity:0;transform:translateY(16px);filter:blur(4px)}to{opacity:1;transform:none;filter:none}}
+@keyframes scFade{from{opacity:0}to{opacity:1}}
+@keyframes scDrive{from{opacity:0;transform:translateX(-110px)}to{opacity:1;transform:none}}
+/* no grey flicker while the page updates after a click */
+[data-stale='true']{opacity:1 !important;transition:none !important}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}html{scroll-behavior:auto}}
 </style>"""
 
 
@@ -101,7 +110,7 @@ def global_style():
 
 _RESULT_CSS = """<style>
 .sc-banner{display:flex;gap:16px;align-items:center;border-radius:18px;padding:18px 20px;margin:2px 0 6px;
-  border:1px solid;animation:scFadeUp .45s ease-out both}
+  border:1px solid;animation:scFadeUp .7s cubic-bezier(.22,1,.36,1) both}
 .sc-banner .sc-ico{flex:none;width:52px;height:52px;border-radius:99px;display:flex;align-items:center;
   justify-content:center;font-size:1.6rem;font-weight:800;color:#fff}
 .sc-banner .sc-kick{font-size:.8rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.85}
@@ -115,8 +124,9 @@ _RESULT_CSS = """<style>
 .sc-Blocked .sc-ico{background:#FF5A5F}.sc-Blocked .sc-kick{color:#FF9EA1}
 .sc-carriers{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:4px 0 8px}
 .sc-carrier{position:relative;background:#12243D;border:1px solid #22406A;border-radius:16px;padding:18px 18px 14px;
-  animation:scFadeUp .45s ease-out both;transition:transform .2s,box-shadow .2s}
-.sc-carrier:hover{transform:translateY(-3px);box-shadow:0 12px 26px rgba(0,0,0,.28)}
+  animation:scFadeUp .7s cubic-bezier(.22,1,.36,1) both;
+  transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s}
+.sc-carrier:hover{transform:translateY(-4px);box-shadow:0 16px 32px rgba(0,0,0,.3)}
 .sc-carrier.sc-win{border:2px solid #F2690F;background:linear-gradient(160deg,rgba(242,105,15,.16),#12243D 55%)}
 .sc-carrier:nth-child(2){animation-delay:.1s}
 .sc-rib{display:inline-block;font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
