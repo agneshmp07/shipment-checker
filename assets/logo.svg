@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 48" role="img" aria-label="Oops-Proof">
-  <rect x="2" y="6" width="36" height="36" rx="10" fill="#F2690F"/>
-  <path d="M10 18h13a2 2 0 0 1 2 2v12H10z" fill="#fff"/>
-  <path d="M25 22h4.5l3.5 5v5h-8z" fill="#fff"/>
-  <circle cx="15" cy="33.5" r="3" fill="#0A1628" stroke="#fff" stroke-width="1.6"/>
-  <circle cx="29" cy="33.5" r="3" fill="#0A1628" stroke="#fff" stroke-width="1.6"/>
-  <path d="M13.5 25l2.5 2.5 5-5" fill="none" stroke="#F2690F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs><linearGradient id="op-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8A3D"/><stop offset="1" stop-color="#E8611A"/></linearGradient></defs>
+  <g transform="translate(2 6) scale(0.5625)">
+    <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#op-g)"/>
+    <path d="M32 10 L50 16.5 V30 C50 41.5 42.5 49.5 32 54 C21.5 49.5 14 41.5 14 30 V16.5 Z" fill="#0E1B2E"/>
+    <path d="M23 32 L29.5 38.5 L42 26" fill="none" stroke="#FF8A3D" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
   <text x="48" y="32" font-family="Plus Jakarta Sans, Inter, Arial, sans-serif" font-size="22" font-weight="800" fill="#EAF0F7">Oops<tspan fill="#FF8A3D">-Proof</tspan></text>
 </svg>
