@@ -45,7 +45,7 @@ def _pick_suggestion():
 
 
 def render_ask_ai(page: str):
-    with st.container(horizontal=True, horizontal_alignment="right"):
+    with st.container(key="ask-ai", horizontal=True, horizontal_alignment="right"):   # pinned in the top bar
         with st.popover("Ask AI", icon=":material/auto_awesome:", type="primary", key="ask_ai_popover"):
             st.markdown("**Oops-Proof assistant**")
             st.caption("Ask me anything about your shipment, a booking on screen, or how to use Oops-Proof.")

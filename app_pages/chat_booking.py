@@ -5,15 +5,16 @@ import pandas as pd
 import streamlit as st
 
 from core import fmt, llm
-from core.chat_agent import (ChatState, Extraction, ItemPatch, handle_message, is_complete, missing_fields,
+from core.chat_agent import (ChatState, Extraction, ItemPatch, handle_message, is_complete,
                              real_issues)
 from core.check import evaluate
 from core.models import DESTINATION_TYPES, ITEM_ORIGIN_COUNTRIES, ORIGIN_CITIES, PRIORITIES, DESTINATIONS
 from core.offline_parser import offline_extract
-from ui.brand import how_to, page_title
+from ui.brand import booking_checklist, how_to, page_title
 from ui.results import carriers_or_warning, render_evaluation, status_badge
 from ui.voice import say, transcribe
 
+AVATARS = {"assistant": "assets/favicon.png", "user": ":material/person:"}
 GREETING = ("Hi! Tell me about your shipment in your own words — what you're sending, how many, and from "
             "where to where. For example: *“I'm sending 1080 mugs from Manchester to a warehouse in "
             "Frankfurt.”* I'll only ask for what's missing.")
@@ -97,7 +98,7 @@ with chat_col:
             st.session_state.say_next = state.messages[-1]["content"]
     with history:
         for m in state.messages:
-            with st.chat_message(m["role"]):
+            with st.chat_message(m["role"], avatar=AVATARS[m["role"]]):
                 st.markdown(m["content"])
     with st.container(horizontal=True, vertical_alignment="center"):
         st.toggle("Read replies aloud", key="speak_replies", help="The assistant speaks its questions. "
@@ -117,37 +118,30 @@ with card_col:
         st.markdown("**Your booking so far**")
         if is_complete(state):
             status_badge(ev)
-        else:
-            to_go = len(missing_fields(state)) + len(state.pending)
-            st.badge(f"In progress · {to_go} detail{'s' if to_go != 1 else ''} to go", color="gray",
-                     icon=":material/pending:")
 
-        def row(label, value, f=None):
-            shown = value if value not in (None, "—", "") else ":orange[missing]"
-            if f and f in {p.field for p in state.pending if p.target == "booking"}:
-                shown = ":blue[to confirm]"
-            st.markdown(f"{label}: **{shown}**" if shown == value else f"{label}: {shown}")
-
-        row("From", b.origin_city and f"{b.origin_city}, {b.origin_country}")
-        row("To", b.destination_city and f"{b.destination_city}, {b.destination_country}")
-        row("Destination type", b.destination_type)
-        row("Ready date", b.ready_date and fmt.d(b.ready_date))
-        row("Priority", b.seller_priority)
-        row("Pallets", b.pallets and fmt.num(b.pallets))
-        row("Cartons", b.cartons and fmt.num(b.cartons), "cartons")
-        row("Declared value", b.total_declared_value and fmt.money(b.total_declared_value), "total_declared_value")
-        row("Gross weight", b.total_gross_weight_kg and fmt.kg(b.total_gross_weight_kg))
+        pending = {p.field for p in state.pending if p.target == "booking"}
+        rows = [("From", b.origin_city and f"{b.origin_city}, {b.origin_country}", None),
+                ("To", b.destination_city and f"{b.destination_city}, {b.destination_country}", None),
+                ("Destination", b.destination_type, None),
+                ("Ready date", b.ready_date and fmt.d(b.ready_date), None),
+                ("Priority", b.seller_priority, None),
+                ("Pallets", b.pallets and fmt.num(b.pallets), None),
+                ("Cartons", b.cartons and fmt.num(b.cartons), "cartons"),
+                ("Declared value", b.total_declared_value and fmt.money(b.total_declared_value), "total_declared_value"),
+                ("Gross weight", b.total_gross_weight_kg and fmt.kg(b.total_gross_weight_kg), None)]
         if b.destination_type == "Warehouse":
-            row("Delivery slot", None if b.delivery_appointment_booked is None
-                else ("booked" if b.delivery_appointment_booked else "not booked"))
-        row("Seller", b.seller_name)
+            rows.append(("Delivery slot", None if b.delivery_appointment_booked is None
+                         else ("booked" if b.delivery_appointment_booked else "not booked"), None))
+        rows += [("Seller", b.seller_name, None), ("Items", f"{len(b.items)} product{'s' if len(b.items) != 1 else ''}"
+                                                   if b.items else None, None)]
+        st.html(booking_checklist(rows, pending))
         if b.items:
+            dash = lambda v, f=fmt.num: "—" if v is None else f(v)
             st.dataframe(pd.DataFrame([{
-                "Item": it.description or it.sku, "Qty": it.quantity, "£/unit": it.unit_price,
-                "Per carton": it.units_per_carton, "Cartons": it.cartons, "kg/unit": it.unit_weight_kg,
-                "HS code": it.hs_code, "Made in": it.country_of_origin} for it in b.items]), hide_index=True)
-        else:
-            row("Items", None)
+                "Item": it.description or it.sku or "—", "Qty": dash(it.quantity), "£/unit": dash(it.unit_price),
+                "Per carton": dash(it.units_per_carton), "Cartons": dash(it.cartons),
+                "kg/unit": dash(it.unit_weight_kg), "HS code": it.hs_code or "—",
+                "Made in": it.country_of_origin or "—"} for it in b.items]), hide_index=True)
         if ev.recommendation.winner:
             w = ev.recommendation.winner
             st.caption(f"Best carrier so far: {w.option.carrier} — {fmt.money(w.total_cost)}, "

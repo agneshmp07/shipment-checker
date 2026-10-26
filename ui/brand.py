@@ -5,8 +5,8 @@ the numbered step cards). Class names are prefixed "sc-" so the CSS can't leak.
 """
 from __future__ import annotations
 
-import base64
-from pathlib import Path
+
+import html
 
 import streamlit as st
 
@@ -25,7 +25,6 @@ _CSS = """
 .sc-chip{font-size:.85rem;color:#EAF0F7;background:rgba(255,255,255,.06);border:1px solid #22406A;
   padding:6px 12px;border-radius:99px}
 .sc-hero-text{flex:1 1 380px;min-width:0}
-.sc-truck{flex:0 1 300px;width:300px;max-width:100%}
 @media (max-width:760px){.sc-hero{padding:24px 20px}.sc-hero h1{font-size:1.8rem}}
 .sc-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:4px 0}
 .sc-step{background:#12243D;border:1px solid #22406A;border-radius:16px;padding:16px 16px 14px}
@@ -39,25 +38,64 @@ _CSS = """
 .sc-hero-text>*{animation:scFadeUp .9s cubic-bezier(.22,1,.36,1) both}
 .sc-hero-text>*:nth-child(1){animation-delay:.1s}.sc-hero-text>*:nth-child(2){animation-delay:.2s}
 .sc-hero-text>*:nth-child(3){animation-delay:.3s}.sc-hero-text>*:nth-child(4){animation-delay:.4s}
-.sc-truck{animation:scDrive 1.5s cubic-bezier(.22,1,.36,1) .35s both}
 .sc-step{animation:scFadeUp .8s cubic-bezier(.22,1,.36,1) .5s both;
   transition:transform .35s cubic-bezier(.22,1,.36,1),border-color .35s,box-shadow .35s}
 .sc-step:nth-child(2){animation-delay:.6s}.sc-step:nth-child(3){animation-delay:.7s}
 .sc-step:hover{transform:translateY(-4px);border-color:#F2690F;box-shadow:0 16px 32px rgba(0,0,0,.3)}
-@media (prefers-reduced-motion:reduce){.sc-hero,.sc-truck,.sc-step,.sc-banner,.sc-carrier{animation:none!important;transition:none!important}}
+/* product preview card: the fix plays once, ~3.4 s after the page opens */
+.sc-pv{flex:0 1 380px;max-width:100%;background:#0F1F35;border:1px solid #2A4A75;border-radius:16px;padding:16px 18px;
+  box-shadow:0 24px 60px rgba(0,0,0,.35);font-size:.86rem;color:#D5DEEA;
+  animation:scFadeUp .9s cubic-bezier(.22,1,.36,1) .35s both}
+.sc-pv-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px}
+.sc-pv-id{font-weight:700;color:#fff;font-size:.95rem}
+.sc-pv-sub{color:#8FA3BD;font-size:.8rem;margin-top:2px}
+.sc-pill{font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:99px;white-space:nowrap}
+.sc-red{background:rgba(255,90,95,.16);color:#FF9EA1;border:1px solid rgba(255,90,95,.4)}
+.sc-green{background:rgba(46,204,113,.16);color:#7BE3A6;border:1px solid rgba(46,204,113,.45)}
+.sc-pv-row{display:grid;grid-template-columns:18px 1fr auto;gap:8px;align-items:center;padding:7px 0;
+  border-top:1px solid #1E3352}
+.sc-pv-rule{color:#B9C8DC;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-pv-val{font-variant-numeric:tabular-nums;color:#fff;text-align:right;white-space:nowrap}
+.sc-x{color:#FF7A7E;font-weight:800}.sc-ok{color:#5BD98C;font-weight:800}
+.sc-pv-cause{margin-top:10px;background:rgba(242,105,15,.08);border:1px solid rgba(242,105,15,.3);border-radius:12px;
+  padding:10px 12px;animation:scFadeUp .7s cubic-bezier(.22,1,.36,1) 1.6s both}
+.sc-pv-kick{font-size:.68rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#FF9A4D;margin-bottom:3px}
+.sc-pv-btn{display:inline-block;margin-top:8px;background:#F2690F;color:#fff;font-weight:700;font-size:.78rem;
+  padding:6px 12px;border-radius:8px;animation:scPress .5s ease-in-out 2.9s both}
+.sc-pv-foot{margin-top:10px;color:#8FA3BD;font-size:.8rem;animation:scFade .6s ease-out 3.9s both}
+.sc-sw{display:grid}.sc-sw>*{grid-area:1/1}
+.sc-a{animation:scOut .35s ease-in 3.35s both}.sc-b{animation:scIn .45s cubic-bezier(.22,1,.36,1) 3.4s both}
+@keyframes scOut{from{opacity:1}to{opacity:0;transform:translateY(-4px)}}
+@keyframes scIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@keyframes scPress{0%,100%{transform:none;filter:none}45%{transform:scale(.94);filter:brightness(.85)}}
+@media (prefers-reduced-motion:reduce){.sc-a{display:none}.sc-b{opacity:1}}
+@media (prefers-reduced-motion:reduce){.sc-hero,.sc-step,.sc-banner,.sc-carrier{animation:none!important;transition:none!important}}
 </style>
 """
 
 # The illustration is an image: st.html's sanitiser removes inline <svg>, but allows data-URI images.
-_TRUCK_FILE = Path(__file__).resolve().parent.parent / "assets" / "hero-truck.svg"
-_TRUCK = (f'<img class="sc-truck" alt="" src="data:image/svg+xml;base64,'
-          f'{base64.b64encode(_TRUCK_FILE.read_bytes()).decode()}">')
+# A product preview instead of an illustration: BK-105 from the organisers' sample, playing once:
+# two Red checks, the root cause, a one-tap fix, then Ready to ship. Plain HTML/CSS (st.html strips SVG).
+_PREVIEW = """<div class="sc-pv" aria-label="Example: booking BK-105 goes from blocked to ready to ship after one fix">
+ <div class="sc-pv-top"><div><div class="sc-pv-id">BK-105 · Highland Knitwear</div>
+  <div class="sc-pv-sub">London → Lyon · 1 pallet · 80 cartons</div></div>
+  <div class="sc-sw"><span class="sc-pill sc-red sc-a">Blocked · 2 issues</span><span class="sc-pill sc-green sc-b">Ready to ship</span></div></div>
+ <div class="sc-pv-row"><div class="sc-sw"><span class="sc-x sc-a">✕</span><span class="sc-ok sc-b">✓</span></div>
+  <div class="sc-pv-rule">R-03 · Packing</div>
+  <div class="sc-sw sc-pv-val"><span class="sc-a">24 × 45 = 1,080 ≠ 1,200</span><span class="sc-b">24 × 50 = 1,200</span></div></div>
+ <div class="sc-pv-row"><div class="sc-sw"><span class="sc-x sc-a">✕</span><span class="sc-ok sc-b">✓</span></div>
+  <div class="sc-pv-rule">R-04 · Carton total</div>
+  <div class="sc-sw sc-pv-val"><span class="sc-a">items 75 ≠ 80</span><span class="sc-b">80 = 80</span></div></div>
+ <div class="sc-pv-cause"><div class="sc-pv-kick">Root cause · high confidence</div>
+  <div>SOCK-01 cartons should be <b>50</b>, not 45</div><div class="sc-pv-btn">Set cartons to 50</div></div>
+ <div class="sc-pv-foot">Recommended: Carrier B · £210 · 3 days</div>
+</div>"""
 
 
 def hero(kicker: str, title_html: str, subtitle: str, chips: list[str]):
     chip_html = "".join(f'<span class="sc-chip">{c}</span>' for c in chips)
     st.html(f"""{_CSS}<div class="sc-hero"><div class="sc-hero-text"><span class="sc-kicker">{kicker}</span>
-        <h1>{title_html}</h1><p>{subtitle}</p><div class="sc-chips">{chip_html}</div></div>{_TRUCK}</div>""")
+        <h1>{title_html}</h1><p>{subtitle}</p><div class="sc-chips">{chip_html}</div></div>{_PREVIEW}</div>""")
 
 
 def steps(items: list[tuple[str, str]]):
@@ -91,6 +129,15 @@ GLOBAL_CSS = """<style>
 [data-testid='stBaseButton-secondary']:hover{transform:translateY(-1px)}
 [data-testid='stExpander'] details{transition:border-color .2s}
 [data-testid='stExpander'] details:hover{border-color:#F2690F}
+/* layout: Ask AI sits in the top navigation bar, so the page starts right under it */
+.st-key-ask-ai{position:fixed;top:.55rem;right:1.25rem;z-index:999991;width:auto !important}
+[data-testid='stMainBlockContainer']{padding-top:4.25rem}
+@media (max-width:640px){[data-testid='stMainBlockContainer']{padding-top:3.75rem}.st-key-ask-ai{right:.75rem}}
+/* calmer page titles in the brand typeface */
+[data-testid='stHeading'] h1{font-family:'Plus Jakarta Sans',Inter,sans-serif;font-size:2.1rem;font-weight:800;
+  letter-spacing:-.02em;line-height:1.15;padding-bottom:.15rem}
+[data-testid='stHeading'] h2,[data-testid='stHeading'] h3{font-family:'Plus Jakarta Sans',Inter,sans-serif;letter-spacing:-.01em}
+[data-testid='stCaptionContainer']{color:#9FB0C6}
 /* shared motion: a soft rise that sharpens from a slight blur, on an ease-out curve that settles */
 @keyframes scFadeUp{from{opacity:0;transform:translateY(16px);filter:blur(4px)}to{opacity:1;transform:none;filter:none}}
 @keyframes scFade{from{opacity:0}to{opacity:1}}
@@ -206,3 +253,35 @@ def carrier_cards(rec):
             f'<div class="sc-cstats"><span>⏱ {o.transit_days:g} days</span><span>🎯 {o.on_time_rate:g}% on time</span>'
             f'<span>⚖ max {o.max_weight_per_pallet_kg:,.0f} kg/pallet</span></div>{note}</div>')
     st.html(f'{_CSS}{_RESULT_CSS}<div class="sc-carriers">{"".join(cards)}</div>')
+
+
+# ---- Chat: the live booking as a checklist --------------------------------------------------
+
+_CHECKLIST_CSS = """<style>
+.sc-ck-bar{display:flex;align-items:center;gap:10px;margin:2px 0 10px;font-size:.8rem;color:#9FB0C6}
+.sc-ck-track{flex:1;height:6px;border-radius:99px;background:#1E3352;overflow:hidden}
+.sc-ck-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#F2690F,#FF8A3D);
+  transition:width .6s cubic-bezier(.22,1,.36,1)}
+.sc-ck{display:grid;grid-template-columns:20px 112px 1fr;gap:4px 8px;align-items:baseline;font-size:.9rem}
+.sc-ck i{font-style:normal;font-weight:800;text-align:center}
+.sc-ck .d{color:#5BD98C}.sc-ck .c{color:#7DB4FF}.sc-ck .t{color:#4A6283}
+.sc-ck .l{color:#9FB0C6}.sc-ck .v{color:#fff;font-weight:600}.sc-ck .m{color:#5D7392}
+</style>"""
+
+
+def booking_checklist(rows: list[tuple[str, object, object]], to_confirm: set[str]):
+    """rows: (label, value or None, field). Done ✓, to confirm (blue), still to go ○, with a progress bar."""
+    done = sum(1 for _, v, f in rows if v not in (None, "") and f not in to_confirm)
+    cells = []
+    for label, value, field in rows:
+        if value in (None, ""):
+            mark, val = '<i class="t">○</i>', '<span class="m">to go</span>'
+        elif field in to_confirm:
+            mark, val = '<i class="c">◐</i>', f'<span class="v">{html.escape(str(value))}</span> <span class="c">· to confirm</span>'
+        else:
+            mark, val = '<i class="d">✓</i>', f'<span class="v">{html.escape(str(value))}</span>'
+        cells.append(f'{mark}<span class="l">{html.escape(label)}</span><span>{val}</span>')
+    pct = round(100 * done / len(rows)) if rows else 0
+    return (f'{_CHECKLIST_CSS}<div class="sc-ck-bar"><span>{done} of {len(rows)} details</span>'
+            f'<div class="sc-ck-track"><div class="sc-ck-fill" style="width:{pct}%"></div></div></div>'
+            f'<div class="sc-ck">{"".join(cells)}</div>')
