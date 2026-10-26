@@ -66,8 +66,8 @@ def test_r01_short_fails_with_digit_count():
 def test_r01_five_digits_lost_zero_hint_when_the_chapter_fits():
     (i,) = rules.r01_hs_code(booking([item(description="Roasted coffee beans, 1 kg bag", hs_code="90121",
                                            hs_possible_leading_zero_lost=True)]))
-    assert i.severity == "Red" and "may be 090121" in i.explanation and "coffee, tea and spices" in i.explanation
-    assert i.fix_action is None                          # we never set an HS code for you
+    assert i.severity == "Red" and "dropped the leading zero" in i.explanation and "coffee, tea and spices" in i.explanation
+    assert i.fix_action["value"] == "090121" and i.fix_action["certain"]     # sure: real code, chapter fits
 
 
 @pytest.mark.parametrize("code", ["123456", "999999", "000000", "770000", "620000", "12345678901", "12a456"])

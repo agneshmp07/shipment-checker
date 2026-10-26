@@ -338,6 +338,11 @@ def diagnose(b: Booking, issues: list[Issue]) -> tuple[list[RootCause], list[Iss
     return roots, [i for i in issues if issue_key(i) not in covered]
 
 
+def clear_data_issues(b: Booking, field: str, sku: Optional[str] = None):
+    """Drop the loader's DATA issues about a field once it has been set (e.g. a misspelt country fixed)."""
+    b.data_issues = [i for i in b.data_issues if not (i.field == field and i.item_sku == sku)]
+
+
 def apply_fix(b: Booking, action: dict) -> str:
     """Apply a fix_action to the booking in place. Returns 'cartons for MUG-01: 80 → 90'."""
     f, value = action["field"], action["value"]
@@ -352,6 +357,7 @@ def apply_fix(b: Booking, action: dict) -> str:
         where = f" for {obj.sku}"
     old = getattr(obj, f)
     setattr(obj, f, value)
+    clear_data_issues(b, f, action.get("sku") if action["target"] == "item" else None)
     if f == "hs_code":
         obj.hs_possible_leading_zero_lost = False
     show = lambda v: fmt.money(v) if f in ("total_declared_value", "unit_price") else (
@@ -368,7 +374,8 @@ def apply_fix(b: Booking, action: dict) -> str:
 
 
 def high_confidence_actions(b: Booking, issues: list[Issue]) -> list[tuple[RootCause, dict]]:
-    """Fixes safe to apply without asking: High-confidence root causes only.
+    """Fixes safe to apply without asking: High-confidence root causes, plus issues whose own fix is
+    certain (a misspelt choice, an HS code that lost its leading zero in Excel).
 
     Totals (declared value, carton total, gross weight) are diagnosed as if the item fixes
     were already made, so a High total fix is only safe when every item fix in the booking
@@ -384,6 +391,9 @@ def high_confidence_actions(b: Booking, issues: list[Issue]) -> list[tuple[RootC
         if r not in item_roots and item_roots and not items_all_high:
             continue
         out.append((r, r.fix_action))
+    # sure corrections the rules/loader flag themselves: misspellings, an Excel-dropped HS zero
+    out += [(i, i.fix_action) for i in issues if i.fix_action and i.fix_action.get("certain")
+            and all(i.fix_action != a for _, a in out)]
     return out
 
 

@@ -80,6 +80,9 @@ def render_issue(issue, key: str, ev: Optional[Evaluation] = None, on_fix=None, 
         st.write(issue.explanation)
         st.markdown(f"**Why it matters:** {issue.why_it_matters}")
         st.markdown(f"**How to fix:** {issue.fix}")
+        if ev is not None and issue.fix_action and issue.fix_action.get("certain"):   # sure fixes only
+            fix_button(ev, issue.fix_action, issue.fix_action.get("label", "Apply fix"), f"{key}-btn",
+                       msg_key, on_fix)
 
 
 def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str], None]] = None,

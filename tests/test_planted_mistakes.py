@@ -51,4 +51,4 @@ def test_orphan_item_reported(loaded):
 def test_lost_leading_zero_hint(loaded, carriers):
     b = next(b for b in loaded.bookings if b.booking_id == "BK-105")
     (issue,) = [i for i in rules.run_rules(b, carriers, TODAY) if i.rule_id == "R-01"]
-    assert "090111" in issue.explanation and issue.fix_action is None    # a pointer, never set for you
+    assert "090111" in issue.explanation and issue.fix_action["value"] == "090111" and issue.fix_action["certain"]

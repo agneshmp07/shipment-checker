@@ -41,8 +41,8 @@ def findings_dialog(evals: list[Evaluation], fix_all: Callable[[], None]):
 
     st.write("Here's what needs attention, starting with the bookings that can't ship yet. Press **Fix** on a "
              "booking to correct it — we'll fix what we can, you change the rest, then come straight back here.")
-    if st.button("Fix all high-confidence mistakes", type="primary", icon=":material/auto_fix_high:",
-                 help="Applies only the fixes we're confident about; the rest stay for you to decide."):
+    if st.button("Fix every mistake we're sure of", type="primary", icon=":material/auto_fix_high:",
+                 help="Typos, totals that don't add up and dropped zeros — the fixes we're sure of. The rest stay for you."):
         fix_all()
         st.rerun()
 

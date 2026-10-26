@@ -16,7 +16,9 @@ import streamlit as st
 from core import fmt, hs
 from core.check import Evaluation, evaluate
 from core.diagnosis import apply_fix
-from core.models import ITEM_ORIGIN_COUNTRIES, PRIORITIES
+from core.diagnosis import clear_data_issues
+from core.models import (DESTINATION_TYPES, DESTINATIONS, ITEM_ORIGIN_COUNTRIES, ORIGIN_CITIES,
+                         PRIORITIES)
 from core.rules import scorecard
 from ui import correct
 from ui.results import get_carriers
@@ -48,13 +50,25 @@ def _txt(v):
     return None if v is None or (isinstance(v, float) and math.isnan(v)) or str(v).strip() == "" else str(v).strip()
 
 
+CHOICES = {"origin_city": ("Origin city", ORIGIN_CITIES), "destination_country": ("Destination country", list(DESTINATIONS)),
+           "destination_city": ("Destination city", [c for cs in DESTINATIONS.values() for c in cs]),
+           "destination_type": ("Destination type", DESTINATION_TYPES), "seller_priority": ("Seller priority", PRIORITIES)}
+
+
 def _needed(ev: Evaluation, everything: bool) -> tuple[list[str], list[str], set]:
     """(booking fields, item fields, SKUs to show) behind this booking's problems."""
-    if everything or any(i.rule_id == "DATA" for i in ev.issues):
+    if everything or any(i.rule_id == "DATA" and not i.field for i in ev.issues):
         return (["pallets", "cartons", "total_declared_value", "total_gross_weight_kg", "ready_date",
-                 "delivery_appointment_booked", "seller_priority"], list(ITEM_COLS), {it.sku for it in ev.booking.items})
+                 "delivery_appointment_booked", *CHOICES], list(ITEM_COLS), {it.sku for it in ev.booking.items})
     bf, itf, skus = [], [], set()
     for i in ev.issues:
+        if i.rule_id == "DATA":                         # a value the loader couldn't use: just that field
+            if i.item_sku and i.field in ITEM_COLS:
+                itf += [i.field] if i.field not in itf else []
+                skus.add(i.item_sku)
+            elif i.field and i.field not in bf:
+                bf.append(i.field)
+            continue
         bf += [f for f in BOOKING_FIELDS.get(i.rule_id, []) if f not in bf]
         itf += [f for f in ITEM_FIELDS.get(i.rule_id, []) if f not in itf]
         if i.rule_id in ITEM_FIELDS:
@@ -85,6 +99,8 @@ def _invalid(booking_vals: dict, item_rows: list) -> list[str]:
                 errors.append(f"{name.capitalize()}{where} must be a whole number.")
         elif field == "country_of_origin" and not v:
             errors.append(f"Made in{where} is empty.")
+        elif field in CHOICES and not v:
+            errors.append(f"{CHOICES[field][0]} is empty — choose one.")
 
     for f, v in booking_vals.items():
         check(f, v)
@@ -111,9 +127,13 @@ def _editor(ev: Evaluation, everything: bool) -> list[str]:
                     v = c.selectbox("Delivery slot booked", ["Yes", "No"], index=None if b.delivery_appointment_booked is None
                                     else (0 if b.delivery_appointment_booked else 1))
                     vals[f] = None if v is None else v == "Yes"
-                elif f == "seller_priority":
-                    vals[f] = c.selectbox("Seller priority", PRIORITIES, index=PRIORITIES.index(b.seller_priority)
-                                          if b.seller_priority in PRIORITIES else None)
+                elif f in CHOICES:
+                    label, options = CHOICES[f]
+                    if f == "destination_city" and b.destination_country in DESTINATIONS:
+                        options = DESTINATIONS[b.destination_country]
+                    cur = getattr(b, f)
+                    vals[f] = c.selectbox(label, options, index=options.index(cur) if cur in options else None,
+                                          placeholder=f"Was '{cur}' — choose" if cur else "Choose")
                 else:
                     label = {"pallets": "Pallets", "cartons": "Total cartons", "total_declared_value": "Declared value (£)",
                              "total_gross_weight_kg": "Gross weight (kg)"}[f]
@@ -162,6 +182,8 @@ def _editor(ev: Evaluation, everything: bool) -> list[str]:
 
     def put(obj, field, new, where=""):
         old = getattr(obj, field)
+        if new is not None:                             # a valid value now: the loader's complaint is settled
+            clear_data_issues(b, field, obj.sku if obj is not b else None)
         if new != old:
             setattr(obj, field, new)
             shown = lambda v: "—" if v is None else (fmt.d(v) if isinstance(v, date) else
@@ -214,8 +236,8 @@ def fix_dialog(booking_id: str):
         picks = correct.suggestions(ev)
         with st.container(border=True):
             st.markdown("#### :material/auto_fix_high: Let us fix it")
-            st.caption("We only change something when the numbers prove what's right. "
-                       "Anything we're not sure of is left for you below.")
+            st.caption("We fix it for you when we're sure: a clear typo ('Germny' → Germany), numbers that "
+                       "don't add up, a zero Excel dropped. Anything only you can know is left for you below.")
             if picks:
                 for s in picks:
                     st.session_state.setdefault(s["key"], s["conf"] == "High")
@@ -229,7 +251,7 @@ def fix_dialog(booking_id: str):
                     st.rerun()
             else:
                 st.caption(":material/front_hand: Nothing here we can be certain of — this needs information "
-                           "only you have (like the real HS code or a booked delivery slot). Enter it below; "
+                           "only you have (like a missing HS code or whether a delivery slot is booked). Enter it below; "
                            "we'll check it before saving.")
 
         # ---- 2. Or change it yourself

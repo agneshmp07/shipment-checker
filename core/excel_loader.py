@@ -16,6 +16,7 @@ from typing import Any, Optional
 
 import openpyxl
 
+from core import spelling
 from core.models import (
     DESTINATIONS, DESTINATION_TYPES, ITEM_ORIGIN_COUNTRIES, ORIGIN_CITIES,
     ORIGIN_COUNTRY, PRIORITIES, Booking, Issue, Item,
@@ -234,11 +235,25 @@ def read_table(ws, columns: dict[str, str], notes: Optional[list[str]] = None
 
 
 def data_issue(severity: str, title: str, explanation: str, fix: str,
-               booking_id: Optional[str] = None, sku: Optional[str] = None) -> Issue:
+               booking_id: Optional[str] = None, sku: Optional[str] = None,
+               field: Optional[str] = None, fix_action: Optional[dict] = None) -> Issue:
     return Issue(rule_id="DATA", severity=severity, title=title, explanation=explanation,
                  why_it_matters="This value is needed to check the booking; until it is "
                                 "corrected some checks cannot run.",
-                 fix=fix, booking_id=booking_id, item_sku=sku)
+                 fix=fix, booking_id=booking_id, item_sku=sku, field=field, fix_action=fix_action)
+
+
+def spelling_issue(severity: str, label: str, raw, meant, where: str, field: str, booking_id,
+                   sku: Optional[str] = None) -> Issue:
+    """A misspelt choice we can correct for certain ('Germny' -> 'Germany')."""
+    shown = "Yes" if meant is True else "No" if meant is False else meant
+    action = {"target": "item" if sku else "booking", "field": field, "value": meant,
+              "label": f"Correct '{raw}' → '{shown}'", "certain": True}
+    if sku:
+        action["sku"] = sku
+    return data_issue(severity, f"{label} misspelt", f"{where}: {label.lower()} is '{raw}' — clearly a "
+                      f"misspelling of '{shown}'.", f"Correct it to '{shown}' (one tap, or Fix all).",
+                      booking_id, sku, field, action)
 
 
 def build_booking(row_no: int, rec: dict) -> Booking:
@@ -295,11 +310,16 @@ def build_booking(row_no: int, rec: dict) -> Booking:
                                  f"{where}: currency is '{cur}'. All values must be in GBP.",
                                  "Convert values to GBP and set currency to GBP.", bid))
 
-    val, err = parse_yes_no(rec.get("delivery_appointment_booked"))
-    if err:
+    raw_appt = rec.get("delivery_appointment_booked")
+    val, err = parse_yes_no(raw_appt)
+    meant = spelling.yes_no(raw_appt) if err and err != "blank" else None
+    if meant is not None:
+        issues.append(spelling_issue("Amber", "Delivery appointment booked", raw_appt, meant, where,
+                                     "delivery_appointment_booked", bid))
+    elif err:
         issues.append(data_issue("Amber", "Delivery appointment booked is unclear",
                                  f"{where}: delivery appointment booked is {err}.",
-                                 "Enter Yes or No.", bid))
+                                 "Enter Yes or No.", bid, field="delivery_appointment_booked"))
     b.delivery_appointment_booked = val
 
     if not bid:
@@ -316,16 +336,20 @@ def _choice(b: Booking, rec: dict, f: str, label: str, allowed: list[str], where
     raw = rec.get(f)
     if is_blank(raw):
         b.data_issues.append(data_issue("Red", f"{label} is missing", f"{where}: {label} is blank.",
-                                        f"Choose one of: {', '.join(allowed)}.", b.booking_id))
+                                        f"Choose one of: {', '.join(allowed)}.", b.booking_id, field=f))
         return
     match = match_choice(raw, allowed)
     if match:
         setattr(b, f, match)
     else:
         setattr(b, f, text(raw))
-        b.data_issues.append(data_issue("Red", f"{label} not recognised",
-                                        f"{where}: {label} '{raw}' is not one of the allowed values.",
-                                        f"Choose one of: {', '.join(allowed)}.", b.booking_id))
+        meant = spelling.correct(raw, allowed)
+        if meant:
+            b.data_issues.append(spelling_issue("Red", label, raw, meant, where, f, b.booking_id))
+        else:
+            b.data_issues.append(data_issue("Red", f"{label} not recognised",
+                                            f"{where}: {label} '{raw}' is not one of the allowed values.",
+                                            f"Choose one of: {', '.join(allowed)}.", b.booking_id, field=f))
 
 
 def build_item(row_no: int, rec: dict) -> tuple[Item, list[Issue]]:
@@ -356,11 +380,15 @@ def build_item(row_no: int, rec: dict) -> tuple[Item, list[Issue]]:
     raw_coo = rec.get("country_of_origin")
     if not is_blank(raw_coo):
         it.country_of_origin = match_choice(raw_coo, ITEM_ORIGIN_COUNTRIES) or text(raw_coo)
-        if it.country_of_origin not in ITEM_ORIGIN_COUNTRIES:
+        meant = spelling.correct(raw_coo, ITEM_ORIGIN_COUNTRIES)
+        if it.country_of_origin not in ITEM_ORIGIN_COUNTRIES and meant and it.sku:
+            issues.append(spelling_issue("Amber", "Country of origin", raw_coo, meant, where,
+                                         "country_of_origin", it.booking_id, it.sku))
+        elif it.country_of_origin not in ITEM_ORIGIN_COUNTRIES:
             issues.append(data_issue("Amber", f"Country of origin not recognised for {label_sku}",
                                      f"{where}: country of origin '{raw_coo}' is not in the allowed list.",
                                      f"Choose one of: {', '.join(ITEM_ORIGIN_COUNTRIES)}.",
-                                     it.booking_id, it.sku))
+                                     it.booking_id, it.sku, field="country_of_origin"))
     if not it.sku:
         issues.append(data_issue("Amber", f"SKU is missing on Items row {row_no}",
                                  f"{where}: SKU is blank.", "Enter the product code.", it.booking_id))

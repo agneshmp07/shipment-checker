@@ -29,13 +29,14 @@ def _label(action: dict) -> str:
 
 
 def suggestions(ev: Evaluation) -> list[dict]:
-    """The fixes we're certain of for one booking (High confidence only), items before the totals.
+    """The fixes we're certain of for one booking, items before the totals: High-confidence root causes,
+    misspellings ('Germny' -> 'Germany') and an HS code that lost its leading zero in Excel.
 
-    Guesses are never offered: anything less than certain, and facts only the seller knows (a booked
-    delivery slot, the ready date, the right HS code), is left for the person to enter."""
+    Guesses are never offered: facts only the seller knows (a booked delivery slot, the ready date, an HS
+    code that's missing) are left for the person to enter."""
     if not ev.issues:
         return []
-    out = [{"label": r.fix_label or _label(a), "conf": "High", "action": a, "why": r.title}
+    out = [{"label": getattr(r, "fix_label", None) or _label(a), "conf": "High", "action": a, "why": r.title}
            for r, a in high_confidence_actions(ev.booking, ev.issues)]
     bid = ev.booking.booking_id
     for s in out:                                          # a stable widget key per suggestion

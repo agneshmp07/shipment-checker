@@ -24,13 +24,14 @@ def test_fix_all_only_touches_high_confidence():
     build()
     bookings = load_workbook(OUT).bookings
     changed = fix_all(bookings, ev)
-    assert changed == {"BK-106": ["declared value: £3,500.00 → £3,000.00"],
+    assert changed == {"BK-105": ["HS code for COF-01: 90111 → 090111"],         # Excel-dropped zero: certain
+                       "BK-106": ["declared value: £3,500.00 → £3,000.00"],
                        "BK-107": ["cartons for MUG-01: 80 → 90"],
                        "BK-108": ["cartons: 60 → 65"]}
     status = {b.booking_id: ev(b).status for b in bookings}
     assert status["BK-106"] == status["BK-107"] == status["BK-108"] == "Ready"
-    # left for a person: HS codes, dangerous goods, medium-confidence guesses, slots, dates
-    for bid in ("BK-104", "BK-105", "BK-110", "BK-111", "BK-112", "BK-113"):
+    # left for a person: missing HS codes, dangerous goods, uncertain guesses, slots, dates
+    for bid in ("BK-104", "BK-110", "BK-111", "BK-112", "BK-113"):
         assert bid not in changed
 
 
@@ -145,4 +146,6 @@ def test_only_certain_fixes_are_offered(tmp_path, monkeypatch):
     for b in at.session_state["upload_bookings"]:
         for s in suggestions(evaluate(b, STANDIN_CARRIERS, date.today())):
             assert s["conf"] == "High"
-            assert s["action"]["field"] not in ("hs_code", "delivery_appointment_booked", "ready_date")
+            assert s["action"]["field"] not in ("delivery_appointment_booked", "ready_date")   # only you know
+            if s["action"]["field"] == "hs_code":                    # only ever the Excel-dropped zero
+                assert s["action"]["certain"] and s["action"]["value"].startswith("0")

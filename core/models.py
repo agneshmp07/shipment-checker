@@ -44,7 +44,8 @@ class Issue(BaseModel):
     booking_id: Optional[str] = None
     # Machine-readable fix for the "Apply fix" button (Phase 7), e.g.
     # {"target": "item", "sku": "MUG-01", "field": "cartons", "value": 90}
-    fix_action: Optional[dict] = None
+    fix_action: Optional[dict] = None    # with "certain": True it is offered (and applied by Fix all) as a sure fix
+    field: Optional[str] = None          # input field a DATA issue is about; fixing that field clears it
 
 
 class Item(BaseModel):

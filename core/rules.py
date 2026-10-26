@@ -123,14 +123,19 @@ def r01_hs_code(b: Booking) -> list[Issue]:
         elif len(digits) < 6:
             fix = (f"Enter the full HS code (at least 6 digits) for '{it.description or _name(it)}'; "
                    "check it on the UK Trade Tariff (gov.uk/trade-tariff).")
-            hint = ""
+            hint, action = "", None
             chapter = zero_chapter(digits, it.description) if len(digits) == 5 else None
-            if chapter and it.hs_possible_leading_zero_lost:   # a pointer only: we never set an HS code for you
-                hint = (f" Excel may have dropped a leading zero — if the product is in chapter 0{digits[0]} "
-                        f"({chapter}), the code may be 0{digits}. Check it before you enter it.")
+            if chapter and it.hs_possible_leading_zero_lost and not hs.problem("0" + digits):
+                # sure: Excel stored it as a number (dropping the 0), 0+digits is a real code, and its
+                # chapter matches the product. Anything less certain gets no fix.
+                hint = (f" Excel dropped the leading zero: 0{digits} is a real code in chapter 0{digits[0]} "
+                        f"({chapter}), which matches '{it.description}'.")
+                fix = f"Restore the zero: set it to 0{digits}, and keep the column formatted as text in Excel."
+                action = {"target": "item", "sku": it.sku, "field": "hs_code", "value": "0" + digits,
+                          "label": f"Restore the dropped zero: {digits} → 0{digits}", "certain": True}
             out.append(_issue("R-01", b, f"{_name(it)} has HS code '{it.hs_code}' with only "
                                          f"{len(digits)} digits; at least 6 are needed.{hint}",
-                              fix, it.sku))
+                              fix, it.sku, fix_action=action))
         elif hs.problem(it.hs_code):
             out.append(_issue("R-01", b, f"{_name(it)} ({it.description or 'no description'}): "
                                          f"{hs.problem(it.hs_code)}.",
