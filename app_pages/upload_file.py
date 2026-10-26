@@ -1,7 +1,7 @@
 """Check a file: upload Sheets 1 & 2 -> summary + actions -> bookings table -> one booking in tabs.
 
 What's wrong in each booking is explained in the "What we found" pop-up, so the page itself
-stays short: three status tiles, one row of actions, a five-column table, and the selected
+stays short: three status cards (tap one to filter), one row of actions, a five-column table, and the selected
 booking's details organised in tabs.
 """
 from collections import Counter
@@ -18,7 +18,7 @@ from core.excel_export import corrected_workbook
 from core.excel_loader import load_workbook
 from core.rules import RULE_NAMES, TITLES, scorecard
 from ui.brand import how_to, page_title
-from ui import fixflow, scan
+from ui import fixflow, scan, tiles
 from ui.findings import findings_dialog
 from ui.results import carriers_or_warning, render_evaluation, render_issue
 
@@ -33,7 +33,7 @@ if uploaded is not None and st.session_state.get("upload_source") != uploaded.fi
     res = load_workbook(uploaded.getvalue())
     st.session_state.update(upload_source=uploaded.file_id, upload_name=uploaded.name,
                             upload_bytes=uploaded.getvalue(), fix_all_result=None, show_findings=True, play_scan=True,
-                            focus_booking=None,
+                            focus_booking=None, tile_filter=None,
                             upload_bookings=res.bookings, upload_file_issues=res.file_issues,
                             upload_notes=res.notes, upload_pristine=[b.model_dump() for b in res.bookings])
 
@@ -78,13 +78,19 @@ def _undo_all():
                             fix_all_result=None, upload_pristine=[b.model_dump() for b in res.bookings])
 
 
-# ---- Summary: three tiles + one row of actions --------------------------------------------------
+# ---- Summary: three status cards (tap one to filter the table) + one row of actions ---------------
 counts = Counter(ev.status for ev in evals)
+focus = st.session_state.get("focus_booking")
+status_of = {ev.booking.booking_id: ev.status for ev in evals}
+if focus in status_of and st.session_state.get("tile_filter") not in (None, status_of[focus]):
+    st.session_state.tile_filter = None                # 'View details' on a booking the filter hides
+emptied = st.session_state.get("tile_filter")
+if emptied and not counts[emptied]:                    # e.g. every blocked booking has just been fixed
+    st.toast(f"No bookings {tiles.WORDS[emptied]} any more — showing them all.", icon=":material/celebration:")
+    st.session_state.tile_filter = None
+    st.session_state.pop("batch_table", None)
 st.caption(f"Results for **{st.session_state.upload_name}** · {len(evals)} booking{'s' if len(evals) != 1 else ''}")
-with st.container(horizontal=True):
-    st.metric(":material/block: Can't ship yet", counts["Blocked"], border=True)
-    st.metric(":material/warning: Warnings", counts["Warnings"], border=True)
-    st.metric(":material/check_circle: Ready to ship", counts["Ready"], border=True)
+tiles.status_tiles(counts, st.session_state.upload_source)
 
 original = st.session_state.get("upload_bytes")
 pristine = st.session_state.get("upload_pristine")
@@ -130,7 +136,14 @@ if result is not None and result["changed"]:
             st.markdown(f"**{bid}** ({result['before'][bid].lower()} → {now.get(bid, '?').lower()}): "
                         + "; ".join(items))
 
-# ---- Bookings table ------------------------------------------------------------------------------
+# ---- Bookings table (only the tapped status, if a card is on) ------------------------------------
+shown_status = st.session_state.get("tile_filter")
+if shown_status:
+    evals = [ev for ev in evals if ev.status == shown_status]
+    with st.container(horizontal=True, vertical_alignment="center"):
+        st.caption(f"Showing only the {len(evals)} booking{'s' if len(evals) != 1 else ''} {tiles.WORDS[shown_status]}.")
+        st.button("Show all", icon=":material/filter_alt_off:", type="tertiary", key="tile-clear",
+                  on_click=tiles._toggle, args=(shown_status,))
 scores = [scorecard(ev.booking, ev.issues) for ev in evals]
 table = pd.DataFrame([{
     "Booking": ev.booking.booking_id, "Status": ev.badge,
@@ -160,8 +173,7 @@ with tab_list:
                          key="batch_table")
 rows = event.selection.rows
 ids = [e.booking.booking_id for e in evals]
-focus = st.session_state.get("focus_booking")
-if rows:
+if rows and rows[0] < len(evals):
     selected = rows[0]
     st.session_state.focus_booking = None
 elif focus in ids:

@@ -48,9 +48,24 @@ def test_upload_sample_shows_every_booking(app):
     grid = app.dataframe[1].value                         # the 10-rule grid tab
     assert list(grid.columns) == ["Booking", "Passed"] + [f"R-{n:02d}" for n in range(1, 11)]
     assert set(grid.iloc[0, 2:]) <= {"✓", "✕", "!", "–"}
-    metrics = {m.label.split(": ")[-1].split(":")[-1].strip(): m.value for m in app.metric}
-    tiles = {k: v for k, v in metrics.items() if k in ("Can't ship yet", "Warnings", "Ready to ship")}
+    tiles = dict(b.label.rsplit(": ", 1) for b in app.button if (b.key or "").startswith("tilebtn-"))
     assert tiles == {"Can't ship yet": "9", "Warnings": "2", "Ready to ship": "3"}
+
+
+def test_tapping_a_status_card_filters_the_table(app):
+    app.switch_page("app_pages/upload_file.py").run()
+    upload_file(app, OUT)
+    app.button(key="tilebtn-Ready").click().run()
+    assert not app.exception
+    table = app.dataframe[0].value
+    assert len(table) == 3 and all(s.endswith("Ready to ship") for s in table["Status"])
+    assert len(app.dataframe[1].value) == 3                # the 10-rule grid follows the filter
+    app.button(key="tilebtn-Ready").click().run()          # tap again: everything is back
+    assert len(app.dataframe[0].value) == 14
+    app.button(key="tilebtn-Blocked").click().run()
+    assert len(app.dataframe[0].value) == 9
+    app.button(key="tile-clear").click().run()             # 'Show all'
+    assert len(app.dataframe[0].value) == 14
 
 
 def test_no_sample_shortcuts_on_upload_page(app):
