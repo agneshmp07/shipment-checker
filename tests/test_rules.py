@@ -224,3 +224,22 @@ def test_status_ordering_and_multi_error():
     issues = rules.run_rules(b, TEST_CARRIERS, TODAY)
     assert ids(issues) == ["R-01", "R-03", "R-04", "R-08", "R-09", "R-10"]
     assert rules.status(issues) == "Blocked"
+
+
+# Scorecard -------------------------------------------------------------------
+from tests.conftest import STANDIN_CARRIERS  # noqa: E402
+
+
+def test_scorecard_counts_passes_breaks_and_unchecked():
+    b = booking([item(hs_code="6912")], total_gross_weight_kg=None)     # R-01 broken; no gross weight
+    issues = rules.run_rules(b, STANDIN_CARRIERS, TODAY)
+    states = {r["rule"]: r["state"] for r in rules.scorecard(b, issues)}
+    assert states["R-01"] == "red"
+    assert states["R-05"] == states["R-07"] == "unchecked"              # missing data is never a pass
+    assert list(states) == [f"R-{n:02d}" for n in range(1, 11)]
+    assert sum(s == "pass" for s in states.values()) == 7
+
+
+def test_scorecard_clean_booking_passes_all_ten():
+    b = booking()
+    assert all(r["state"] == "pass" for r in rules.scorecard(b, rules.run_rules(b, STANDIN_CARRIERS, TODAY)))

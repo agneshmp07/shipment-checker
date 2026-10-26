@@ -7,6 +7,7 @@ import streamlit as st
 
 from core.check import Evaluation
 from core.findings import findings
+from core.rules import scorecard
 from ui import correct
 
 STATUS = {"Blocked": ("red", ":material/block:", "Can't ship yet"),
@@ -53,6 +54,12 @@ def findings_dialog(evals: list[Evaluation], fix_all: Callable[[], None]):
             st.markdown(f"**{b.booking_id} · {b.seller_name or 'Seller not set'}** — "
                         f"{b.origin_city or '?'} → {b.destination_city or '?'}")
             st.badge(words, color=colour, icon=icon)
+            score = scorecard(b, ev.issues)
+            broke = [r["rule"] for r in score if r["state"] in ("red", "amber")]
+            unchecked = [r["rule"] for r in score if r["state"] == "unchecked"]
+            st.caption(f"Passed **{sum(r['state'] == 'pass' for r in score)} of 10** rules"
+                       + (f" · broke {', '.join(broke)}" if broke else "")
+                       + (f" · not checked (data missing): {', '.join(unchecked)}" if unchecked else ""))
             st.markdown(":material/error: **What's wrong**\n" + _bullets(f.wrong))
             st.markdown(":material/build: **What to fix** — tick the fixes we can make for you")
             picks = correct.fix_list(ev, f.fix)

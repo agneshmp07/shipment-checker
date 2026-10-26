@@ -324,6 +324,33 @@ def r10_ready_date(b: Booking, today: Optional[date] = None) -> list[Issue]:
 # ---- Run everything --------------------------------------------------------
 
 
+def _checkable(b: Booking) -> dict[str, bool]:
+    """Whether each rule had the data it needs. A rule that skips for lack of data is 'not checked',
+    never counted as passed."""
+    items = bool(b.items)
+    return {
+        "R-01": items,
+        "R-02": items_value(b) is not None and b.total_declared_value is not None,
+        "R-03": _all_known(b.items, "quantity", "units_per_carton", "cartons"),
+        "R-04": b.cartons is not None and _all_known(b.items, "cartons"),
+        "R-05": None not in (b.total_gross_weight_kg, b.pallets, b.destination_country),
+        "R-06": items,
+        "R-07": goods_weight(b) is not None and b.total_gross_weight_kg is not None,
+        "R-08": b.destination_type is not None,
+        "R-09": items,
+        "R-10": b.ready_date is not None,
+    }
+
+
+def scorecard(b: Booking, issues: list[Issue]) -> list[dict]:
+    """One row per rule: {'rule', 'name', 'state'} with state 'pass', 'red', 'amber' or 'unchecked'."""
+    broke = {i.rule_id: i.severity for i in issues if i.rule_id in RULE_NAMES}
+    can = _checkable(b)
+    return [{"rule": r, "name": RULE_NAMES[r],
+             "state": broke[r].lower() if r in broke else ("pass" if can[r] else "unchecked")}
+            for r in RULE_NAMES]
+
+
 def run_rules(b: Booking, carriers: list[CarrierOption], today: Optional[date] = None,
               chosen: Optional[CarrierOption] = None) -> list[Issue]:
     """All rulebook issues for one booking, Red first then Amber, in rule order."""

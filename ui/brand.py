@@ -296,3 +296,36 @@ def booking_checklist(rows: list[tuple[str, object, object]], to_confirm: set[st
     return (f'{_CHECKLIST_CSS}<div class="sc-ck-bar"><span>{done} of {len(rows)} details</span>'
             f'<div class="sc-ck-track"><div class="sc-ck-fill" style="width:{pct}%"></div></div></div>'
             f'<div class="sc-ck">{"".join(cells)}</div>')
+
+
+# ---- The 10-rule scorecard for one booking -----------------------------------------------------
+
+_RULE_CSS = """<style>
+.sc-rules-head{display:flex;align-items:baseline;gap:10px;margin:2px 0 8px;font-size:.95rem;color:#B9C8DC}
+.sc-rules-head b{font-family:'Plus Jakarta Sans',Inter,sans-serif;font-size:1.15rem;color:#fff}
+.sc-rules{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:10px}
+@media (max-width:760px){.sc-rules{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.sc-rule{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;border:1px solid;font-size:.82rem;
+  line-height:1.2;min-width:0}
+.sc-rule i{flex:none;width:20px;height:20px;border-radius:99px;display:flex;align-items:center;justify-content:center;
+  font-style:normal;font-weight:800;font-size:.75rem}
+.sc-rule span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc-rule b{display:block;font-size:.72rem;letter-spacing:.04em;opacity:.85}
+.sc-rule.pass{background:rgba(46,204,113,.08);border-color:rgba(46,204,113,.35);color:#CFEFDC}.sc-rule.pass i{background:#2ECC71;color:#0E1B2E}
+.sc-rule.red{background:rgba(255,90,95,.10);border-color:rgba(255,90,95,.5);color:#FFD2D3}.sc-rule.red i{background:#FF5A5F;color:#fff}
+.sc-rule.amber{background:rgba(255,159,67,.10);border-color:rgba(255,159,67,.5);color:#FFE2C4}.sc-rule.amber i{background:#FF9F43;color:#0E1B2E}
+.sc-rule.unchecked{background:rgba(255,255,255,.03);border-color:#2A4A75;color:#8FA3BD}.sc-rule.unchecked i{background:#2A4A75;color:#B9C8DC}
+</style>"""
+RULE_MARK = {"pass": ("✓", "passed"), "red": ("✕", "broken"), "amber": ("!", "warning"), "unchecked": ("–", "not checked: data missing")}
+
+
+def rule_chips(score: list[dict]) -> str:
+    """'Rule check · 8 of 10 passed' and one chip per rule (R-01 … R-10)."""
+    passed = sum(r["state"] == "pass" for r in score)
+    chips = "".join(f'<div class="sc-rule {r["state"]}" title="{r["rule"]} {r["name"]}: {RULE_MARK[r["state"]][1]}">'
+                    f'<i>{RULE_MARK[r["state"]][0]}</i><span><b>{r["rule"]}</b>{html.escape(r["name"])}</span></div>'
+                    for r in score)
+    unchecked = sum(r["state"] == "unchecked" for r in score)
+    note = f" · {unchecked} not checked (data missing)" if unchecked else ""
+    return (f'{_RULE_CSS}<div class="sc-rules-head"><b>{passed} of 10 rules passed</b>'
+            f'<span>Rule check{note}</span></div><div class="sc-rules">{chips}</div>')

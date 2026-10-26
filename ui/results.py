@@ -15,10 +15,10 @@ from core.confirmation import DELIVERY_ASSUMPTION
 from core.dangerous_goods import possible_battery
 from core.labels import MAX_LABELS, label_count, labels_pdf
 from core.report import html_report
-from core.rules import RULE_NAMES
+from core.rules import scorecard
 from core.trade_connect import load_directory, match_buyers
 from ui import correct
-from ui.brand import carrier_cards, status_banner
+from ui.brand import carrier_cards, rule_chips, status_banner
 from ui.invoice import render_invoice
 
 STATUS_STYLE = {  # status -> (badge colour, icon)
@@ -116,8 +116,7 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
 
     # ---- Problems & fixes ----
     with t_problems:
-        failed = {i.rule_id for i in ev.issues}
-        passed = [r for r in RULE_NAMES if r not in failed]
+        st.html(rule_chips(scorecard(b, ev.issues)))      # R-01 … R-10: passed, broken or not checked
         if editable:                                    # upload page: correct this booking by hand
             with st.expander("Edit this booking by hand", icon=":material/edit:",
                              expanded=st.session_state.get("manual_open") == b.booking_id):
@@ -159,8 +158,6 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
                 st.warning(f"**Possible dangerous goods — please confirm:** {h['sku']} — {h['reason']}. "
                            "This is an AI suggestion only; it does not change the status.",
                            icon=":material/help:")
-        if ev.issues and passed:
-            st.caption("Passed: " + " · ".join(RULE_NAMES[r] for r in passed))
 
     # ---- Carrier ----
     with t_carrier:

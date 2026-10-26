@@ -16,7 +16,7 @@ from core.check import evaluate
 from core.diagnosis import fix_all
 from core.excel_export import corrected_workbook
 from core.excel_loader import load_workbook
-from core.rules import TITLES
+from core.rules import RULE_NAMES, TITLES, scorecard
 from ui.brand import how_to, page_title
 from ui import scan
 from ui.findings import findings_dialog
@@ -128,16 +128,33 @@ if result is not None and result["changed"]:
                         + "; ".join(items))
 
 # ---- Bookings table ------------------------------------------------------------------------------
+scores = [scorecard(ev.booking, ev.issues) for ev in evals]
 table = pd.DataFrame([{
     "Booking": ev.booking.booking_id, "Status": ev.badge,
+    "Rules passed": f"{sum(r['state'] == 'pass' for r in sc)}/10",
+    "Broke": ", ".join(r["rule"] for r in sc if r["state"] in ("red", "amber")) or "—",
     "Route": f"{ev.booking.origin_city} → {ev.booking.destination_city}",
-    "Seller": ev.booking.seller_name,
     "Best carrier": (f"{ev.recommendation.winner.option.carrier} · {fmt.money(ev.recommendation.winner.total_cost)}"
                      if ev.recommendation.winner else "—"),
-} for ev in evals])
-st.caption("Tap a row to open that booking.")
-event = st.dataframe(table, hide_index=True, on_select="rerun", selection_mode="single-row",
-                     key="batch_table")
+    "Seller": ev.booking.seller_name,
+} for ev, sc in zip(evals, scores)])
+tab_list, tab_rules = st.tabs([":material/table_rows: Bookings", ":material/rule: 10-rule grid"], key="batch_view")
+with tab_rules:                                       # every booking against R-01 … R-10
+    mark = {"pass": "✓", "red": "✕", "amber": "!", "unchecked": "–"}
+    colour = {"✓": "color:#5BD98C", "✕": "color:#FF7A7E;font-weight:700", "!": "color:#FFB36B;font-weight:700",
+              "–": "color:#6F84A1"}
+    grid = pd.DataFrame([{"Booking": ev.booking.booking_id,
+                          "Passed": f"{sum(r['state'] == 'pass' for r in sc)}/10",
+                          **{r["rule"]: mark[r["state"]] for r in sc}} for ev, sc in zip(evals, scores)])
+    st.dataframe(grid.style.map(lambda v: colour.get(v, ""), subset=list(RULE_NAMES)), hide_index=True,
+                 column_config={r: st.column_config.TextColumn(r, help=RULE_NAMES[r], width="small")
+                                for r in RULE_NAMES})
+    st.caption("✓ passed · ✕ broken, must fix · ! warning · – not checked (data missing). "
+               "Hover a rule for its name. " + " · ".join(f"{r} {n}" for r, n in RULE_NAMES.items()))
+with tab_list:
+    st.caption("Tap a row to open that booking.")
+    event = st.dataframe(table, hide_index=True, on_select="rerun", selection_mode="single-row",
+                         key="batch_table")
 rows = event.selection.rows
 ids = [e.booking.booking_id for e in evals]
 focus = st.session_state.get("focus_booking")

@@ -40,7 +40,14 @@ def test_upload_sample_shows_every_booking(app):
         rules = EXPECTED[row["Booking"]]
         want = "Ready to ship" if not rules else "Blocked" if rules & red_rules else "Ready with warnings"
         assert row["Status"].endswith(want), row["Booking"]
-    assert list(table.columns) == ["Booking", "Status", "Route", "Seller", "Best carrier"]
+    assert list(table.columns) == ["Booking", "Status", "Rules passed", "Broke", "Route", "Best carrier", "Seller"]
+    for _, row in table.iterrows():                       # the rules each booking broke, and its score
+        broke = sorted(r for r in EXPECTED[row["Booking"]] if r != "DATA")
+        assert row["Broke"] == (", ".join(broke) or "—"), row["Booking"]
+        assert int(row["Rules passed"].split("/")[0]) <= 10 - len(broke)
+    grid = app.dataframe[1].value                         # the 10-rule grid tab
+    assert list(grid.columns) == ["Booking", "Passed"] + [f"R-{n:02d}" for n in range(1, 11)]
+    assert set(grid.iloc[0, 2:]) <= {"✓", "✕", "!", "–"}
     metrics = {m.label.split(": ")[-1].split(":")[-1].strip(): m.value for m in app.metric}
     tiles = {k: v for k, v in metrics.items() if k in ("Can't ship yet", "Warnings", "Ready to ship")}
     assert tiles == {"Can't ship yet": "9", "Warnings": "2", "Ready to ship": "3"}
