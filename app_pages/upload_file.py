@@ -18,7 +18,7 @@ from core.excel_export import corrected_workbook
 from core.excel_loader import load_workbook
 from core.rules import TITLES
 from ui.brand import how_to, page_title
-from ui import scan
+from ui import correct, scan
 from ui.findings import findings_dialog
 from ui.results import carriers_or_warning, render_evaluation, render_issue
 
@@ -94,9 +94,6 @@ with st.container(horizontal=True):
     if st.button(f"See what's wrong ({problems})" if problems else "See the summary", type="primary",
                  icon=":material/report:", help="What's wrong in each booking, what to fix, and our recommendation."):
         st.session_state.show_findings = True
-    st.button("Fix all high-confidence mistakes", icon=":material/auto_fix_high:",
-              on_click=_fix_all, help="Applies only the fixes Oops-Proof is highly confident about. Guesses and "
-              "things only you can decide (an HS code, booking a delivery slot) are left for you.")
     st.download_button("Download corrected file", lambda: corrected_workbook(original, bookings)[0],
                        file_name=f"{Path(st.session_state.upload_name).stem}_corrected.xlsx",
                        icon=":material/download:", disabled=not changes,
@@ -116,16 +113,18 @@ result = st.session_state.get("fix_all_result")
 if result is not None:
     changed = result["changed"]
     n_fixed = sum(len(v) for v in changed.values())
-    notes.append(f"Fix all corrected {n_fixed} mistake{'s' if n_fixed != 1 else ''}" if changed
-                 else "Fix all found nothing it was sure about — the rest need your decision")
+    notes.append(f"Corrected {n_fixed} mistake{'s' if n_fixed != 1 else ''} so far" if changed
+                 else "Nothing was changed — the rest need your decision")
 with st.container(horizontal=True, vertical_alignment="center"):
     if notes:
         st.caption(" · ".join(notes))
     if changes:
         st.button("Undo all fixes", icon=":material/undo:", on_click=_undo_all, type="tertiary")
+correct.render(evals, bookings)
+
 if result is not None and result["changed"]:
     now = {e.booking.booking_id: e.status for e in evals}
-    with st.expander("See what Fix all changed", icon=":material/auto_fix_high:"):
+    with st.expander("See what was corrected", icon=":material/auto_fix_high:"):
         for bid, items in result["changed"].items():
             st.markdown(f"**{bid}** ({result['before'][bid].lower()} → {now.get(bid, '?').lower()}): "
                         + "; ".join(items))

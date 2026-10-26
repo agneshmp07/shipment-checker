@@ -84,9 +84,49 @@ def test_upload_page_fix_all_button(tmp_path, monkeypatch):
     at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=60).run()
     at.switch_page("app_pages/upload_file.py").run()
     upload_file(at, OUT)
-    next(b for b in at.button if b.label == "Fix all high-confidence mistakes").click().run()
+    ticked = [c for c in at.checkbox if c.key and c.key.startswith("pick-")]
+    assert ticked and any(c.value for c in ticked) and not all(c.value for c in ticked)   # High ticked, rest not
+    n = sum(c.value for c in ticked)
+    next(b for b in at.button if b.label.startswith("Apply selected")).click().run()
     assert not at.exception
-    assert any("Fix all corrected 3 mistakes" in c.value for c in at.caption)
+    assert any(f"Corrected {n} mistake" in c.value for c in at.caption)
     assert any(b.label == "Undo all fixes" for b in at.button)
     next(b for b in at.button if b.label == "Undo all fixes").click().run()
     assert not any(b.label == "Undo all fixes" for b in at.button)
+
+
+def test_upload_page_apply_only_the_ticked_fix(tmp_path, monkeypatch):
+    path = tmp_path / "carriers.json"
+    path.write_text(json.dumps([c.model_dump() for c in STANDIN_CARRIERS]))
+    monkeypatch.setenv("SHIPMENT_CARRIERS_PATH", str(path))
+    build()
+    at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=60).run()
+    at.switch_page("app_pages/upload_file.py").run()
+    upload_file(at, OUT)
+    picks = [c for c in at.checkbox if c.key and c.key.startswith("pick-")]
+    for c in picks:
+        c.uncheck()
+    picks[0].check().run()
+    next(b for b in at.button if b.label.startswith("Apply selected")).click().run()
+    assert not at.exception
+    assert any("Corrected 1 mistake so far" in c.value for c in at.caption)
+
+
+def test_upload_page_correct_manually(tmp_path, monkeypatch):
+    path = tmp_path / "carriers.json"
+    path.write_text(json.dumps([c.model_dump() for c in STANDIN_CARRIERS]))
+    monkeypatch.setenv("SHIPMENT_CARRIERS_PATH", str(path))
+    build()
+    at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=60).run()
+    at.switch_page("app_pages/upload_file.py").run()
+    upload_file(at, OUT)
+    at.session_state["correct_mode"] = "Correct manually"
+    at.run()
+    bid = at.selectbox(key="manual_booking").value
+    total = next(n for n in at.number_input if n.label == "Total cartons")
+    total.set_value((total.value or 0) + 7)
+    next(b for b in at.button if b.label == "Save & re-check").click().run()
+    assert not at.exception
+    booking = next(b for b in at.session_state["upload_bookings"] if b.booking_id == bid)
+    assert any("(manual)" in m for m in at.session_state["fix_all_result"]["changed"][bid])
+    assert booking.cartons is not None and any(b.label == "Undo all fixes" for b in at.button)
