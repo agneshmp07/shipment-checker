@@ -121,8 +121,20 @@ JS = """<script>
     const shadow = new T.Mesh(new T.PlaneGeometry(3.4, 1.3), new T.MeshBasicMaterial({map: new T.CanvasTexture(sc), transparent: true, depthWrite: false}));
     shadow.rotation.x = -Math.PI / 2; shadow.position.y = -1.42; scene.add(shadow);
 
-    const state = {yaw: 0.45, pitch: 0.1, hopAt: -1, spinAt: -1, blinkAt: 2.2, mood: 0, start: performance.now() / 1000};
-    box.addEventListener('pointerdown', () => { state.spinAt = performance.now() / 1000; state.hopAt = state.spinAt; });
+    const now = () => performance.now() / 1000;
+    const state = {hopAt: -1, spinAt: -1, blinkAt: now() + 2.2, blinkStart: -1, mood: 0, start: now(), last: now()};
+    // springs: time-based, so the motion is the same at 30, 60 or 120 fps; a little under-damped
+    // so turns settle with a soft, natural overshoot instead of stopping dead
+    const spring = (x = 0) => ({x, v: 0});
+    const step = (s, target, dt, hz, zeta = 0.78) => {
+      const w = 2 * Math.PI * hz; s.v += (w * w * (target - s.x) - 2 * zeta * w * s.v) * dt; s.x += s.v * dt; return s.x;
+    };
+    const yaw = spring(0.45), pitch = spring(0.1), rigX = spring(0), lookX = spring(0), lookY = spring(0);
+    const ease = q => q < .5 ? 4 * q * q * q : 1 - Math.pow(-2 * q + 2, 3) / 2;          // ease-in-out cubic
+    const smooth = (a, b, x) => { const q = Math.min(1, Math.max(0, (x - a) / (b - a))); return q * q * (3 - 2 * q); };
+    box.addEventListener('pointerdown', () => { state.spinAt = now(); state.hopAt = now(); });
+    let visible = true;
+    new IntersectionObserver(es => { visible = es[0].isIntersecting; }).observe(box);   // rest when off-screen
 
     function resize() {
       const w = box.clientWidth, h = box.clientHeight; if (!w || !h) return;
@@ -130,45 +142,63 @@ JS = """<script>
     }
     resize(); new ResizeObserver(resize).observe(box);
 
-    const lerp = (a, b, k) => a + (b - a) * k;
     function frame() {
       if (!box.isConnected) { renderer.dispose(); return; }
-      const t = performance.now() / 1000, since = t - state.start;
-      let ty = 0, tp = 0;
-      const live = pointer.x !== null && performance.now() - pointer.at < 3000;
-      if (live) {
-        const r = box.getBoundingClientRect();
-        ty = Math.max(-1, Math.min(1, (pointer.x - (r.left + r.width / 2)) / 520)) * 0.75;
-        tp = Math.max(-1, Math.min(1, (pointer.y - (r.top + r.height / 2)) / 420)) * 0.38;
-      } else if (since < 4.4) { ty = wide() ? 0.7 : 0.15; tp = wide() ? 0.32 : 0.3; }   // watching the booking card
-      else { ty = Math.sin(t * 0.45) * 0.18; tp = Math.sin(t * 0.33) * 0.05; }   // idle look-around
-      state.yaw = lerp(state.yaw, ty, 0.08); state.pitch = lerp(state.pitch, tp, 0.08);
-      rig.rotation.y = state.yaw; rig.rotation.x = state.pitch;
-      rig.position.x = lerp(rig.position.x, wide() ? -1.6 : 0, 0.2); shadow.position.x = rig.position.x;
-      eyes.forEach(({pupil}) => { pupil.position.x = lerp(pupil.position.x, ty * 0.16, .2); pupil.position.y = lerp(pupil.position.y, -tp * 0.2, .2); });
-
-      // mood: worried while the card is Blocked (until ~3.4 s), happy after
-      if (state.hopAt < 0 && since > 3.4) state.hopAt = t;
-      state.mood = lerp(state.mood, since > 3.4 ? 1 : 0, 0.1);
-      brows.forEach(b => { b.rotation.z = b.userData.side * (0.38 * (1 - state.mood) - 0.1 * state.mood); b.position.y = 0.55 + 0.05 * state.mood; });
-      mouth.rotation.z = state.mood > .5 ? Math.PI : 0; mouth.position.y = state.mood > .5 ? -0.24 : -0.36;
-
-      // hop with squash and stretch; tap = hop + spin
-      let y = Math.sin(t * 1.4) * 0.06, sy = 1 + Math.sin(t * 2.2) * 0.012, spin = 0;
-      if (state.hopAt > 0) {
-        const h = (t - state.hopAt) / 0.62;
-        if (h < 1) { y += Math.sin(h * Math.PI) * 0.75; sy *= h < .15 ? 1 - h * 1.2 : 1 + Math.sin(h * Math.PI) * 0.08; }
-      }
-      if (state.spinAt > 0) { const s = (t - state.spinAt) / 0.9; if (s < 1) spin = (1 - Math.pow(1 - s, 3)) * Math.PI * 2; }
-      bodyG.position.y = y; bodyG.scale.set(1 / Math.sqrt(sy), sy, 1 / Math.sqrt(sy)); bodyG.rotation.y = spin;
-      shadow.scale.setScalar(1 - Math.min(0.45, Math.max(0, y) * 0.5)); shadow.material.opacity = 1 - Math.min(.5, Math.max(0, y) * .6);
-
-      // blink
-      if (t - state.start > state.blinkAt) { state.blinkAt = t - state.start + 3 + Math.random() * 3.5; state.blinkUntil = t + 0.13; }
-      const bl = state.blinkUntil && t < state.blinkUntil ? 0.1 : 1;
-      eyes.forEach(({e}) => { e.scale.y = lerp(e.scale.y, bl, 0.6); });
-      renderer.render(scene, camera);
       requestAnimationFrame(frame);
+      const t = now(), dt = Math.min(1 / 30, t - state.last); state.last = t;
+      if (!visible) return;
+      const since = t - state.start;
+
+      // where to look: the pointer, else the booking card (first seconds), else an idle wandering gaze
+      let ty, tp;
+      if (pointer.x !== null && performance.now() - pointer.at < 3000) {
+        const r = box.getBoundingClientRect();
+        ty = Math.max(-1, Math.min(1, (pointer.x - (r.left + r.width / 2)) / 560)) * 0.72;
+        tp = Math.max(-1, Math.min(1, (pointer.y - (r.top + r.height / 2)) / 460)) * 0.34;
+      } else if (since < 4.4) { ty = wide() ? 0.68 : 0.15; tp = wide() ? 0.3 : 0.28; }
+      else {
+        ty = 0.17 * (Math.sin(t * 0.31) + 0.6 * Math.sin(t * 0.73 + 1.3)) / 1.6;
+        tp = 0.05 * (Math.sin(t * 0.27 + 0.5) + 0.5 * Math.sin(t * 0.61)) / 1.5;
+      }
+      // the eyes lead, the body follows and leans a little into the turn
+      step(lookX, ty, dt, 3.2, 0.9); step(lookY, tp, dt, 3.2, 0.9);
+      step(yaw, ty, dt, 1.25); step(pitch, tp, dt, 1.25);
+      rig.rotation.y = yaw.x; rig.rotation.x = pitch.x;
+      rig.rotation.z = Math.max(-0.09, Math.min(0.09, -yaw.v * 0.05));
+      rig.position.x = step(rigX, wide() ? -1.42 : 0, dt, 1.1, 1); shadow.position.x = rig.position.x;
+      eyes.forEach(({pupil}) => { pupil.position.x = (lookX.x - yaw.x * 0.4) * 0.17; pupil.position.y = -(lookY.x - pitch.x * 0.4) * 0.22; });
+
+      // mood: worried while the card is Blocked (until ~3.4 s), happy after; the mouth morphs through flat
+      if (state.hopAt < 0 && since > 3.4) state.hopAt = t;
+      state.mood += ((since > 3.4 ? 1 : 0) - state.mood) * (1 - Math.exp(-dt * 5));
+      const m = smooth(0, 1, state.mood);
+      brows.forEach(b => { b.rotation.z = b.userData.side * (0.38 * (1 - m) - 0.1 * m); b.position.y = 0.55 + 0.05 * m; });
+      mouth.scale.y = 1 - 2 * m; mouth.position.y = -0.36 + 0.12 * m;
+
+      // breathing and float, then the hop: anticipation crouch, stretch in the air, squash on landing
+      let y = Math.sin(t * 1.3) * 0.055, sy = 1 + Math.sin(t * 2.1) * 0.012, spin = 0;
+      if (state.hopAt > 0) {
+        const h = (t - state.hopAt) / 0.85;
+        if (h < 1) {
+          if (h < 0.18) sy *= 1 - 0.12 * ease(h / 0.18);
+          else if (h < 0.78) {
+            const q = (h - 0.18) / 0.6;
+            y += 0.8 * Math.sin(q * Math.PI);
+            sy *= 1 + 0.1 * Math.sin(q * Math.PI) * (q < 0.5 ? 1 : 0.5) - 0.12 * (1 - smooth(0, 0.22, q));
+          } else sy *= 1 - 0.1 * Math.sin((h - 0.78) / 0.22 * Math.PI);
+        }
+      }
+      if (state.spinAt > 0) { const q = (t - state.spinAt) / 1.0; if (q < 1) spin = ease(q) * Math.PI * 2; }
+      bodyG.position.y = y; bodyG.scale.set(1 / Math.sqrt(sy), sy, 1 / Math.sqrt(sy)); bodyG.rotation.y = spin;
+      const lift = Math.max(0, y);
+      shadow.scale.setScalar(1 - Math.min(0.45, lift * 0.5)); shadow.material.opacity = 1 - Math.min(0.5, lift * 0.6);
+
+      // blink: a quick, soft close and open
+      if (t > state.blinkAt) { state.blinkStart = t; state.blinkAt = t + 3 + Math.random() * 3.5; }
+      const b = (t - state.blinkStart) / 0.16;
+      const open = b >= 0 && b < 1 ? 1 - 0.9 * Math.sin(b * Math.PI) : 1;
+      eyes.forEach(({e}) => { e.scale.y = open; });
+      renderer.render(scene, camera);
     }
     box.classList.add('live');
     requestAnimationFrame(frame);
