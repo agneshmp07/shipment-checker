@@ -18,6 +18,7 @@ from core.report import html_report
 from core.rules import scorecard
 from core.trade_connect import load_directory, match_buyers
 from ui.brand import carrier_cards, rule_chips, status_banner
+from ui import preflight
 from ui.invoice import render_invoice
 
 STATUS_STYLE = {  # status -> (badge colour, icon)
@@ -91,6 +92,7 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
 
     # Header: status in plain words and the four numbers people check first
     status_banner(ev)
+    cleared = preflight.checkpoint(ev)                # the gate: documents unlock only when it clears
     with st.container(horizontal=True):
         st.metric("Pallets", fmt.num(b.pallets), border=True)
         st.metric("Cartons", fmt.num(b.cartons), border=True)
@@ -186,46 +188,65 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
 
     # ---- Confirmation & next steps ----
     with t_confirm:
-        (st.info if ev.status == "Blocked" else st.success)(ev.summary)
-        st.caption("Delivery date is an estimate.", help=DELIVERY_ASSUMPTION)
-        st.markdown("**What happens next**")
-        for n, s in enumerate(ev.next_steps, 1):
-            st.markdown(f"{STEP_ICON[s['state']]} **{n}. {s['step']}** — {s['detail']}")
-        if any(i.rule_id in ("R-03", "R-04") for i in ev.issues):
-            st.caption(":material/warning: Fix the carton counts first, so the labels match what you declared.")
-        inv = st.session_state.get(f"invoice-details-{b.booking_id}")
-        consignee = None
-        if inv is not None:
-            consignee = (inv.buyer_name if inv.consignee_same_as_buyer else inv.consignee_name) or None
-        too_many = label_count(b) > MAX_LABELS
-        with st.container(horizontal=True):
-            st.download_button("Carton labels (PDF)", lambda: labels_pdf(b, consignee),   # built on click
-                               file_name=f"labels_{b.booking_id or 'new'}.pdf", mime="application/pdf",
-                               icon=":material/label:", key=f"{key}-labels", type="primary", disabled=too_many,
-                               help=(f"{label_count(b):,} cartons is more than the {MAX_LABELS:,} labels we print "
-                                     "at once — check the carton counts." if too_many else
-                                     "One label per carton — “Carton 1 of 90” — with product, units, "
-                                     "from / to and a barcode. 8 labels per A4 sheet."))
-            st.download_button("Booking report", lambda: html_report(ev),
-                               file_name=f"booking_{b.booking_id or 'new'}.html", mime="text/html",
-                               icon=":material/download:", key=f"{key}-download")
+        if not cleared:                                  # locked: only the pre-flight report
+            preflight.locked_note("The confirmation and carton labels", ev)
+            st.download_button("Pre-flight report", lambda: html_report(ev),
+                               file_name=f"preflight_{b.booking_id or 'new'}.html", mime="text/html",
+                               icon=":material/download:", key=f"{key}-download",
+                               help="Everything the check found, to share with whoever fixes the data.")
+        else:
+            _confirmation(ev, key)
 
     # ---- Invoice ----
     with t_invoice:
-        render_invoice(ev, key)
+        if cleared:
+            render_invoice(ev, key)
+        else:
+            preflight.locked_note("The commercial invoice", ev)
 
     # ---- Buyers ----
     with t_buyers:
-        matches = match_buyers(b, load_directory())[:3]
-        if not matches:
-            st.info("No buyers in the marketplace want these goods yet.", icon=":material/storefront:")
-        for m in matches:
-            with st.container(border=True):
-                st.markdown(f"**{m.business.name}** · {m.business.city}, {m.business.country}")
-                st.caption(" · ".join(m.reasons))
-        if matches:
-            try:
-                st.page_link("app_pages/trade_connect.py", label="Message these buyers in the Marketplace",
-                             icon=":material/arrow_forward:")
-            except Exception:      # rendered outside the multipage app (e.g. a test harness)
-                st.caption("Message these buyers in the Marketplace.")
+        _buyers(b)
+
+
+def _confirmation(ev: Evaluation, key: str):
+    """The unlocked Confirmation tab: summary, next steps, carton labels and the report."""
+    b = ev.booking
+    st.success(ev.summary, icon=":material/verified:")
+    st.caption("Delivery date is an estimate.", help=DELIVERY_ASSUMPTION)
+    st.markdown("**What happens next**")
+    for n, s in enumerate(ev.next_steps, 1):
+        st.markdown(f"{STEP_ICON[s['state']]} **{n}. {s['step']}** — {s['detail']}")
+    inv = st.session_state.get(f"invoice-details-{b.booking_id}")
+    consignee = None
+    if inv is not None:
+        consignee = (inv.buyer_name if inv.consignee_same_as_buyer else inv.consignee_name) or None
+    too_many = label_count(b) > MAX_LABELS
+    with st.container(horizontal=True):
+        st.download_button("Carton labels (PDF)", lambda: labels_pdf(b, consignee),   # built on click
+                           file_name=f"labels_{b.booking_id or 'new'}.pdf", mime="application/pdf",
+                           icon=":material/label:", key=f"{key}-labels", type="primary", disabled=too_many,
+                           help=(f"{label_count(b):,} cartons is more than the {MAX_LABELS:,} labels we print "
+                                 "at once — check the carton counts." if too_many else
+                                 "One label per carton — “Carton 1 of 90” — with product, units, "
+                                 "from / to and a barcode. 8 labels per A4 sheet."))
+        st.download_button("Booking report", lambda: html_report(ev),
+                           file_name=f"booking_{b.booking_id or 'new'}.html", mime="text/html",
+                           icon=":material/download:", key=f"{key}-download")
+
+
+def _buyers(b):
+    """Buyers tab: up to three marketplace buyers who want these goods."""
+    matches = match_buyers(b, load_directory())[:3]
+    if not matches:
+        st.info("No buyers in the marketplace want these goods yet.", icon=":material/storefront:")
+    for m in matches:
+        with st.container(border=True):
+            st.markdown(f"**{m.business.name}** · {m.business.city}, {m.business.country}")
+            st.caption(" · ".join(m.reasons))
+    if matches:
+        try:
+            st.page_link("app_pages/trade_connect.py", label="Message these buyers in the Marketplace",
+                         icon=":material/arrow_forward:")
+        except Exception:      # rendered outside the multipage app (e.g. a test harness)
+            st.caption("Message these buyers in the Marketplace.")

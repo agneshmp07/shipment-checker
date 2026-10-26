@@ -11,6 +11,7 @@ from core.check import evaluate
 from core.models import DESTINATION_TYPES, ITEM_ORIGIN_COUNTRIES, ORIGIN_CITIES, PRIORITIES, DESTINATIONS
 from core.offline_parser import offline_extract
 from ui.brand import booking_checklist, how_to, page_title
+from ui import preflight
 from ui.results import carriers_or_warning, render_evaluation, status_badge
 from ui.voice import say, transcribe
 
@@ -215,10 +216,10 @@ if is_complete(state):
     st.divider()
     if state.confirmed:
         st.success(f"Booking {b.booking_id} is confirmed. {ev.summary}", icon=":material/task_alt:")
-    elif ev.status == "Blocked":
+    elif not preflight.gate(ev)[0]:                     # the pre-flight gate holds confirmation
         st.button("Confirm booking", disabled=True, icon=":material/lock:",
-                  help="Fix the red issues first — tell me the correct values in the chat.")
-        st.caption("Red issues must be fixed before the booking can be confirmed.")
+                  help="Pre-flight not cleared — tell me the correct values in the chat.")
+        st.caption(":material/lock: Locked until the pre-flight check clears (no red rules, nothing unchecked).")
     elif st.button("Confirm booking", type="primary", icon=":material/check:"):
         state.confirmed = True
         st.rerun()
