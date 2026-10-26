@@ -12,7 +12,7 @@ import streamlit as st
 
 _CSS = """
 <style>
-.sc-hero{display:flex;flex-wrap:wrap;align-items:flex-end;gap:18px 28px;overflow:hidden;border-radius:22px;padding:34px 34px 30px;
+.sc-hero{display:flex;flex-wrap:wrap;align-items:center;gap:18px 28px;overflow:hidden;border-radius:22px;padding:34px 34px 30px;
   background:radial-gradient(1200px 400px at 85% -10%,rgba(242,105,15,.35),transparent 60%),
              linear-gradient(135deg,#0F2747 0%,#0A1628 70%);border:1px solid #22406A}
 .sc-hero h1{font-family:'Plus Jakarta Sans',Inter,sans-serif;font-weight:800;font-size:2.35rem;
@@ -42,8 +42,24 @@ _CSS = """
   transition:transform .35s cubic-bezier(.22,1,.36,1),border-color .35s,box-shadow .35s}
 .sc-step:nth-child(2){animation-delay:.6s}.sc-step:nth-child(3){animation-delay:.7s}
 .sc-step:hover{transform:translateY(-4px);border-color:#F2690F;box-shadow:0 16px 32px rgba(0,0,0,.3)}
+/* the watching eye (the brand mark, 112 px) above the preview card */
+.sc-side{flex:0 1 380px;max-width:100%;display:flex;flex-direction:column;gap:12px}
+.sc-side .sc-pv{flex:none}
+.sc-eye-wrap{display:flex;justify-content:flex-end;align-items:center;gap:14px;
+  animation:scFadeUp .9s cubic-bezier(.22,1,.36,1) .2s both}
+.sc-eye-say{font-family:'Plus Jakarta Sans',Inter,sans-serif;font-weight:700;font-size:.95rem;color:#B9C8DC}
+.sc-eye{position:relative;width:112px;height:112px;flex:none;border-radius:28px;background:#0E1B2E;
+  border:1px solid #2A4A75;box-shadow:0 18px 40px rgba(0,0,0,.35)}
+.sc-eye-o{position:absolute;left:22px;top:29px;width:61px;height:61px;box-sizing:border-box;border-radius:50%;
+  border:12px solid #F5F0E6;transition:transform .09s ease-in}
+.sc-eye-pupil{position:absolute;left:41px;top:48px;width:23px;height:23px;transform:translate(27px,-27px)}
+.sc-eye-dot{width:100%;height:100%;border-radius:50%;background:#F2690F;transition:transform .09s ease-in;
+  box-shadow:0 0 0 3px rgba(242,105,15,.18)}
+.sc-eye.blink .sc-eye-o,.sc-eye.blink .sc-eye-dot{transform:scaleY(.12)}
+@media (max-width:760px){.sc-side{flex-basis:100%}}
+@media (max-width:480px){.sc-pv{padding:14px}.sc-pv-val{font-size:.74rem}.sc-pv-row{gap:6px}}
 /* product preview card: the fix plays once, ~3.4 s after the page opens */
-.sc-pv{flex:0 1 380px;max-width:100%;background:#0F1F35;border:1px solid #2A4A75;border-radius:16px;padding:16px 18px;
+.sc-pv{max-width:100%;background:#0F1F35;border:1px solid #2A4A75;border-radius:16px;padding:16px 18px;
   box-shadow:0 24px 60px rgba(0,0,0,.35);font-size:.86rem;color:#D5DEEA;
   animation:scFadeUp .9s cubic-bezier(.22,1,.36,1) .35s both}
 .sc-pv-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px}
@@ -92,10 +108,57 @@ _PREVIEW = """<div class="sc-pv" aria-label="Example: booking BK-105 goes from b
 </div>"""
 
 
+# The watching eye: the brand mark's "o" is the eye and its orange dot the pupil. It starts as the
+# logo, glances at the preview card, blinks when the card turns Ready, then follows the pointer,
+# a finger, or the phone's tilt. Idle for a while, the dot slides back to its logo spot.
+_EYE = """<div class="sc-eye-wrap" aria-hidden="true"><span class="sc-eye-say">Not on our watch.</span>
+ <div class="sc-eye"><div class="sc-eye-o"></div><div class="sc-eye-pupil"><div class="sc-eye-dot"></div></div></div></div>"""
+
+_EYE_JS = """<script>
+(() => {
+  if (window.__opEye) return; window.__opEye = true;
+  const LOGO = [27, -27], RING = [52.5, 59.5], REACH = 7;          // px, in the 112 px eye
+  const p = {x: null, y: null, at: 0}, cur = {x: LOGO[0], y: LOGO[1]};
+  const start = performance.now(), reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const point = (x, y) => { p.x = x; p.y = y; p.at = performance.now(); };
+  addEventListener('pointermove', e => point(e.clientX, e.clientY), {passive: true});
+  addEventListener('touchmove', e => e.touches[0] && point(e.touches[0].clientX, e.touches[0].clientY), {passive: true});
+  addEventListener('deviceorientation', e => {
+    const eye = document.querySelector('.sc-eye'); if (!eye || e.gamma == null) return;
+    const r = eye.getBoundingClientRect();
+    point(r.left + RING[0] + e.gamma * 10, r.top + RING[1] + ((e.beta || 45) - 45) * 10);
+  }, {passive: true});
+  let nextBlink = start + 3450;                                    // the happy blink as the card turns Ready
+  const blink = eye => { eye.classList.add('blink'); setTimeout(() => eye.classList.remove('blink'), 170); };
+  function frame(t) {
+    const eye = document.querySelector('.sc-eye');
+    if (eye && !reduce) {
+      let tx = LOGO[0], ty = LOGO[1];
+      const since = t - start;
+      if (p.x !== null && t - p.at < 2500) {                       // follow the pointer
+        const r = eye.getBoundingClientRect();
+        const vx = p.x - (r.left + RING[0]), vy = p.y - (r.top + RING[1]), d = Math.hypot(vx, vy) || 1;
+        const m = Math.min(REACH, d / 25); tx = vx / d * m; ty = vy / d * m;
+      } else if (p.x === null && since > 900 && since < 4600) {    // nobody moved yet: watch the card
+        tx = -4.5; ty = 5.5;
+      }
+      cur.x += (tx - cur.x) * 0.14; cur.y += (ty - cur.y) * 0.14;
+      eye.querySelector('.sc-eye-pupil').style.transform = `translate(${cur.x.toFixed(2)}px, ${cur.y.toFixed(2)}px)`;
+      if (t > nextBlink) { blink(eye); nextBlink = t + 3800 + Math.random() * 3800; }
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>"""
+
+
 def hero(kicker: str, title_html: str, subtitle: str, chips: list[str]):
     chip_html = "".join(f'<span class="sc-chip">{c}</span>' for c in chips)
     st.html(f"""{_CSS}<div class="sc-hero"><div class="sc-hero-text"><span class="sc-kicker">{kicker}</span>
-        <h1>{title_html}</h1><p>{subtitle}</p><div class="sc-chips">{chip_html}</div></div>{_PREVIEW}</div>""")
+        <h1>{title_html}</h1><p>{subtitle}</p><div class="sc-chips">{chip_html}</div></div>
+        <div class="sc-side">{_EYE}{_PREVIEW}</div></div>""")
+    st.html(_EYE_JS, unsafe_allow_javascript=True)
 
 
 def steps(items: list[tuple[str, str]]):
