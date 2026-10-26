@@ -18,7 +18,7 @@ from core.excel_export import corrected_workbook
 from core.excel_loader import load_workbook
 from core.rules import TITLES
 from ui.brand import how_to, page_title
-from ui import correct, scan
+from ui import scan
 from ui.findings import findings_dialog
 from ui.results import carriers_or_warning, render_evaluation, render_issue
 
@@ -120,8 +120,6 @@ with st.container(horizontal=True, vertical_alignment="center"):
         st.caption(" · ".join(notes))
     if changes:
         st.button("Undo all fixes", icon=":material/undo:", on_click=_undo_all, type="tertiary")
-correct.render(evals, bookings)
-
 if result is not None and result["changed"]:
     now = {e.booking.booking_id: e.status for e in evals}
     with st.expander("See what was corrected", icon=":material/auto_fix_high:"):
@@ -154,4 +152,4 @@ else:
     selected = 0
 
 st.divider()
-render_evaluation(evals[selected], key=f"upload-{selected}")
+render_evaluation(evals[selected], key=f"upload-{selected}", editable=True)

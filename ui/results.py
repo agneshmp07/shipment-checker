@@ -17,6 +17,7 @@ from core.labels import MAX_LABELS, label_count, labels_pdf
 from core.report import html_report
 from core.rules import RULE_NAMES
 from core.trade_connect import load_directory, match_buyers
+from ui import correct
 from ui.brand import carrier_cards, status_banner
 from ui.invoice import render_invoice
 
@@ -84,7 +85,8 @@ def render_issue(issue, key: str, ev: Optional[Evaluation] = None, on_fix=None, 
                        msg_key, on_fix)
 
 
-def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str], None]] = None):
+def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str], None]] = None,
+                      editable: bool = False):
     """Full results for one booking. `key` keeps widget keys unique per booking.
     on_fix(message) is called after an Apply-fix button changes the booking."""
     b, rec = ev.booking, ev.recommendation
@@ -116,6 +118,10 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
     with t_problems:
         failed = {i.rule_id for i in ev.issues}
         passed = [r for r in RULE_NAMES if r not in failed]
+        if editable:                                    # upload page: correct this booking by hand
+            with st.expander("Edit this booking by hand", icon=":material/edit:",
+                             expanded=st.session_state.get("manual_open") == b.booking_id):
+                correct.manual_editor(ev, key)
         msg = st.session_state.pop(f"fixmsg-{key}", None)
         if msg:
             st.success(msg, icon=":material/build:")

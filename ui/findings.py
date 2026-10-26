@@ -7,6 +7,7 @@ import streamlit as st
 
 from core.check import Evaluation
 from core.findings import findings
+from ui import correct
 
 STATUS = {"Blocked": ("red", ":material/block:", "Can't ship yet"),
           "Warnings": ("orange", ":material/warning:", "Can ship — check the warnings"),
@@ -53,12 +54,27 @@ def findings_dialog(evals: list[Evaluation], fix_all: Callable[[], None]):
                         f"{b.origin_city or '?'} → {b.destination_city or '?'}")
             st.badge(words, color=colour, icon=icon)
             st.markdown(":material/error: **What's wrong**\n" + _bullets(f.wrong))
-            st.markdown(":material/build: **What to fix**\n" + _bullets(f.fix))
+            st.markdown(":material/build: **What to fix** — tick the fixes we can make for you")
+            picks = correct.fix_list(ev, f.fix)
             if f.recommend:
                 st.markdown(":material/lightbulb: **Our recommendation**\n" + _bullets(f.recommend))
-            if st.button(f"Open {b.booking_id}", key=f"find-open-{b.booking_id}", icon=":material/open_in_new:",
-                         on_click=_open, args=(b.booking_id,)):
-                st.rerun()
+            bid = b.booking_id
+            with st.container(horizontal=True):
+                if picks:
+                    n = sum(bool(st.session_state.get(s["key"])) for s in picks)
+                    if st.button(f"Apply ticked fixes ({n})", key=f"find-apply-{bid}", type="primary",
+                                 icon=":material/auto_fix_high:", disabled=n == 0):
+                        correct.apply_picks(ev, picks)
+                        st.session_state.show_findings = True          # reopen with the updated results
+                        st.rerun()
+                if st.button("Edit by hand", key=f"find-edit-{bid}", icon=":material/edit:",
+                             help="Opens this booking with every field and item ready to edit."):
+                    _open(bid)
+                    st.session_state.manual_open = bid
+                    st.rerun()
+                if st.button(f"Open {bid}", key=f"find-open-{bid}", icon=":material/open_in_new:",
+                             on_click=_open, args=(bid,)):
+                    st.rerun()
 
     if ready:
         st.caption("Ready to ship, nothing to fix: " + ", ".join(e.booking.booking_id or "?" for e in ready))
