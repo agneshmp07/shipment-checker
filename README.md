@@ -10,6 +10,7 @@ confirmation shows what happens next.
 
 | Page | What it does |
 |---|---|
+| **Home** | The 3D carton mascot (three.js, `ui/mascot.py`) watches a live BK-105 example: worried while it is Blocked, happy when one fix makes it Ready. It turns to follow the pointer, a finger or the phone's tilt, and spins when tapped. |
 | **Book by chat** | Describe a shipment in your own words. Only missing details are asked for (max 3 at a time); calculated values are confirmed ("That's 90 cartons — correct?"). Change anything mid-conversation ("add a pallet") and get a change summary: `Updated: pallets 3 → 4 · weight per pallet 206.7 kg → 155 kg · cost £450.00 → £600.00 · checks: all passing ✅`. A form is available too. |
 | **Check a file** | Upload an .xlsx with the Bookings and Items sheets; it is checked as soon as it uploads. Batch dashboard (Ready / Warnings / Blocked, most common problem), *Fix all high-confidence mistakes*, *Download corrected file*, then full results per booking including a draft commercial invoice (PDF / Excel). |
 | **Results (both)** | Status badge · root causes ("1 root problem → fixes 2 issues", with the most likely wrong number and a confidence level) · every issue with explanation, why it matters, fix · **Apply fix** buttons that re-run all checks and show before → after · recommended carrier with reason and trade-off vs the runner-up · confirmation · next-steps timeline · downloadable HTML report. |
