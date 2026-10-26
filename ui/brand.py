@@ -47,37 +47,63 @@ _CSS = """
 .sc-step:hover{transform:translateY(-4px);border-color:#F2690F;box-shadow:0 16px 32px rgba(0,0,0,.3)}
 /* hero right side: the 3D mascot looking at the booking card */
 .sc-side{flex:1 1 560px;max-width:680px;position:relative;min-height:440px}
-.sc-side .sc-pv{position:absolute;right:0;bottom:0;width:296px;font-size:.8rem;z-index:2}
+.sc-side .sc-pv{position:absolute;right:0;bottom:0;width:318px;font-size:.8rem;z-index:2}
 @media (max-width:760px){.sc-side{flex-basis:100%;min-height:0;display:flex;flex-direction:column;gap:6px}
   .sc-side .sc-pv{position:relative;width:auto}}
 @media (max-width:480px){.sc-pv{padding:14px}.sc-pv-val{font-size:.74rem}.sc-pv-row{gap:6px}}
-/* product preview card: the fix plays once, ~3.4 s after the page opens */
-.sc-pv{max-width:100%;background:#0F1F35;border:1px solid #2A4A75;border-radius:16px;padding:16px 18px;
-  box-shadow:0 24px 60px rgba(0,0,0,.35);font-size:.86rem;color:#D5DEEA;
+/* the live example card: BK-105 fixes itself on a 10 s loop (blocked -> cursor taps the fix -> confetti ->
+   ready to ship -> reset). The 3D mascot reads this loop's clock to stay in step. */
+.sc-pv{max-width:100%;background:#0F1F35;border:1px solid #2A4A75;border-radius:18px;padding:16px 18px;position:relative;
+  box-shadow:0 24px 60px rgba(0,0,0,.35);font-size:.84rem;color:#D5DEEA;overflow:visible;
   animation:scFadeUp .9s cubic-bezier(.22,1,.36,1) .35s both}
-.sc-pv-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px}
-.sc-pv-id{font-weight:700;color:#fff;font-size:.95rem}
-.sc-pv-sub{color:#8FA3BD;font-size:.8rem;margin-top:2px}
-.sc-pill{font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:99px;white-space:nowrap}
+.sc-pv-live{display:inline-flex;align-items:center;gap:6px;font-size:.66rem;font-weight:800;letter-spacing:.08em;
+  text-transform:uppercase;color:#9FB0C6;margin-bottom:8px}
+.sc-pv-live i{width:7px;height:7px;border-radius:50%;background:#FF5A5F;box-shadow:0 0 0 0 rgba(255,90,95,.6);
+  animation:scLive 1.6s ease-out infinite}
+@keyframes scLive{to{box-shadow:0 0 0 8px rgba(255,90,95,0)}}
+.sc-pv-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
+.sc-pv-id{font-family:'Plus Jakarta Sans',Inter,sans-serif;font-weight:800;color:#fff;font-size:1.25rem;line-height:1}
+.sc-pv-sub{color:#8FA3BD;font-size:.76rem;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-pill{font-size:.7rem;font-weight:700;padding:4px 10px;border-radius:99px;white-space:nowrap}
 .sc-red{background:rgba(255,90,95,.16);color:#FF9EA1;border:1px solid rgba(255,90,95,.4)}
 .sc-green{background:rgba(46,204,113,.16);color:#7BE3A6;border:1px solid rgba(46,204,113,.45)}
-.sc-pv-row{display:grid;grid-template-columns:18px 1fr auto;gap:8px;align-items:center;padding:7px 0;
-  border-top:1px solid #1E3352}
-.sc-pv-rule{color:#B9C8DC;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-pv-row{display:grid;grid-template-columns:16px 1fr auto;gap:8px;align-items:center;padding:6px 0;border-top:1px solid #1E3352}
+.sc-pv-rule{color:#B9C8DC;white-space:nowrap}
 .sc-pv-val{font-variant-numeric:tabular-nums;color:#fff;text-align:right;white-space:nowrap}
 .sc-x{color:#FF7A7E;font-weight:800}.sc-ok{color:#5BD98C;font-weight:800}
-.sc-pv-cause{margin-top:10px;background:rgba(242,105,15,.08);border:1px solid rgba(242,105,15,.3);border-radius:12px;
-  padding:10px 12px;animation:scFadeUp .7s cubic-bezier(.22,1,.36,1) 1.6s both}
-.sc-pv-kick{font-size:.68rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#FF9A4D;margin-bottom:3px}
-.sc-pv-btn{display:inline-block;margin-top:8px;background:#F2690F;color:#fff;font-weight:700;font-size:.78rem;
-  padding:6px 12px;border-radius:8px;animation:scPress .5s ease-in-out 2.9s both}
-.sc-pv-foot{margin-top:10px;color:#8FA3BD;font-size:.8rem;animation:scFade .6s ease-out 3.9s both}
+.sc-pv-cause{position:relative;margin-top:10px;background:rgba(242,105,15,.08);border:1px solid rgba(242,105,15,.3);
+  border-radius:12px;padding:10px 12px;animation:scCause 10s ease infinite}
+.sc-pv-kick{font-size:.66rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#FF9A4D;margin-bottom:3px}
+.sc-pv-btnwrap{position:relative;display:inline-block;margin-top:8px}
+.sc-pv-btn{display:inline-grid;font-weight:700;font-size:.76rem;border-radius:8px;overflow:hidden;animation:scPress 10s ease infinite}
+.sc-pv-btn>*{grid-area:1/1;padding:6px 12px}
+.sc-pv-btn .sc-a{background:#F2690F;color:#fff}.sc-pv-btn .sc-b{background:#2ECC71;color:#0E1B2E}
+.sc-pv-foot{margin-top:10px;color:#8FA3BD;font-size:.78rem;animation:scFoot 10s ease infinite}
 .sc-sw{display:grid}.sc-sw>*{grid-area:1/1}
-.sc-a{animation:scOut .35s ease-in 3.35s both}.sc-b{animation:scIn .45s cubic-bezier(.22,1,.36,1) 3.4s both}
-@keyframes scOut{from{opacity:1}to{opacity:0;transform:translateY(-4px)}}
-@keyframes scIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-@keyframes scPress{0%,100%{transform:none;filter:none}45%{transform:scale(.94);filter:brightness(.85)}}
-@media (prefers-reduced-motion:reduce){.sc-a{display:none}.sc-b{opacity:1}}
+.sc-a{animation:scA 10s ease infinite}.sc-b{animation:scB 10s cubic-bezier(.34,1.56,.64,1) infinite}
+.sc-pill.sc-b{animation:scB 10s cubic-bezier(.34,1.56,.64,1) infinite,scGlow 10s ease infinite}
+/* a little cursor glides in and taps the fix */
+.sc-tap{position:absolute;left:58%;top:62%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;pointer-events:none;
+  background:rgba(255,255,255,.95);border:3px solid #F2690F;box-shadow:0 3px 10px rgba(0,0,0,.4);animation:scTap 10s ease infinite}
+.sc-tap::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid #FF8A3D;opacity:0;animation:scRing 10s ease-out infinite}
+/* confetti from the button when it's fixed */
+.sc-conf{position:absolute;left:50%;top:50%;width:7px;height:7px;border-radius:2px;opacity:0;pointer-events:none;animation:scConf 10s ease-out infinite}
+@keyframes scA{0%,37%{opacity:1;transform:none}41%,95%{opacity:0;transform:translateY(-5px)}99%,100%{opacity:1;transform:none}}
+@keyframes scB{0%,37%{opacity:0;transform:translateY(5px) scale(.9)}43%,94%{opacity:1;transform:none}98%,100%{opacity:0;transform:translateY(5px) scale(.9)}}
+@keyframes scGlow{0%,41%{box-shadow:0 0 0 0 rgba(46,204,113,0)}46%{box-shadow:0 0 0 6px rgba(46,204,113,.35)}
+  56%,100%{box-shadow:0 0 0 0 rgba(46,204,113,0)}}
+@keyframes scCause{0%,8%{opacity:0;transform:translateY(8px)}15%,94%{opacity:1;transform:none}99%,100%{opacity:0;transform:translateY(8px)}}
+@keyframes scPress{0%,34%,40%,100%{transform:none;filter:none}37%{transform:scale(.92);filter:brightness(.85)}}
+@keyframes scFoot{0%,42%{opacity:0;transform:translateY(4px)}48%,94%{opacity:1;transform:none}99%,100%{opacity:0}}
+@keyframes scTap{0%,19%{opacity:0;transform:translate(120px,80px)}23%{opacity:1}33%{transform:translate(0,0)}
+  37%{transform:translate(0,0) scale(.75)}39%{transform:translate(0,0) scale(1)}46%{opacity:1;transform:translate(0,0)}
+  54%,100%{opacity:0;transform:translate(70px,60px)}}
+@keyframes scRing{0%,36%{opacity:0;transform:scale(1)}37%{opacity:1;transform:scale(1)}46%,100%{opacity:0;transform:scale(2.6)}}
+@keyframes scConf{0%,38%{opacity:0;transform:translate(-50%,-50%) scale(.3)}40%{opacity:1}
+  58%{opacity:1;transform:translate(calc(-50% + var(--x)),calc(-50% + var(--y))) rotate(var(--r)) scale(1)}
+  64%,100%{opacity:0;transform:translate(calc(-50% + var(--x)),calc(-50% + var(--y) + 18px)) rotate(var(--r))}}
+@media (prefers-reduced-motion:reduce){.sc-a,.sc-tap,.sc-conf{display:none}.sc-b{opacity:1;animation:none}
+  .sc-pv-cause,.sc-pv-foot,.sc-pv-btn{animation:none}}
 @media (prefers-reduced-motion:reduce){.sc-hero,.sc-step,.sc-banner,.sc-carrier{animation:none!important;transition:none!important}}
 </style>
 """
@@ -85,18 +111,21 @@ _CSS = """
 # The illustration is an image: st.html's sanitiser removes inline <svg>, but allows data-URI images.
 # A product preview instead of an illustration: BK-105 from the organisers' sample, playing once:
 # two Red checks, the root cause, a one-tap fix, then Ready to ship. Plain HTML/CSS (st.html strips SVG).
-_PREVIEW = """<div class="sc-pv" aria-label="Example: booking BK-105 goes from blocked to ready to ship after one fix">
- <div class="sc-pv-top"><div><div class="sc-pv-id">BK-105 · Highland Knitwear</div>
-  <div class="sc-pv-sub">London → Lyon · 1 pallet · 80 cartons</div></div>
-  <div class="sc-sw"><span class="sc-pill sc-red sc-a">Blocked · 2 issues</span><span class="sc-pill sc-green sc-b">Ready to ship</span></div></div>
+_PREVIEW = """<div class="sc-pv" aria-label="Live example: booking BK-105 goes from blocked to ready to ship after one fix">
+ <div class="sc-pv-live"><i></i>Live example</div>
+ <div class="sc-pv-top"><div style="min-width:0"><div class="sc-pv-id">BK-105</div>
+  <div class="sc-pv-sub">Highland Knitwear · London → Lyon</div></div>
+  <div class="sc-sw"><span class="sc-pill sc-red sc-a">Blocked · 2 issues</span><span class="sc-pill sc-green sc-b">✓ Ready to ship</span></div></div>
  <div class="sc-pv-row"><div class="sc-sw"><span class="sc-x sc-a">✕</span><span class="sc-ok sc-b">✓</span></div>
-  <div class="sc-pv-rule">R-03 · Packing</div>
-  <div class="sc-sw sc-pv-val"><span class="sc-a">24 × 45 = 1,080 ≠ 1,200</span><span class="sc-b">24 × 50 = 1,200</span></div></div>
+  <div class="sc-pv-rule">R-03 Packing</div>
+  <div class="sc-sw sc-pv-val"><span class="sc-a">24 × 45 ≠ 1,200</span><span class="sc-b">24 × 50 = 1,200</span></div></div>
  <div class="sc-pv-row"><div class="sc-sw"><span class="sc-x sc-a">✕</span><span class="sc-ok sc-b">✓</span></div>
-  <div class="sc-pv-rule">R-04 · Carton total</div>
-  <div class="sc-sw sc-pv-val"><span class="sc-a">items 75 ≠ 80</span><span class="sc-b">80 = 80</span></div></div>
+  <div class="sc-pv-rule">R-04 Carton total</div>
+  <div class="sc-sw sc-pv-val"><span class="sc-a">75 ≠ 80</span><span class="sc-b">80 = 80</span></div></div>
  <div class="sc-pv-cause"><div class="sc-pv-kick">Root cause · high confidence</div>
-  <div>SOCK-01 cartons should be <b>50</b>, not 45</div><div class="sc-pv-btn">Set cartons to 50</div></div>
+  <div>SOCK-01 cartons should be <b>50</b>, not 45</div>
+  <div class="sc-pv-btnwrap"><div class="sc-pv-btn"><span class="sc-a">Set cartons to 50</span><span class="sc-b">✓ Fixed</span></div>
+   <i class="sc-conf" style="--x:-46px;--y:-38px;--r:120deg;background:#FF8A3D"></i><i class="sc-conf" style="--x:-22px;--y:-56px;--r:-80deg;background:#2ECC71"></i><i class="sc-conf" style="--x:6px;--y:-62px;--r:200deg;background:#F2C744"></i><i class="sc-conf" style="--x:34px;--y:-50px;--r:-140deg;background:#7DB4FF"></i><i class="sc-conf" style="--x:54px;--y:-26px;--r:90deg;background:#FF5A5F"></i><i class="sc-conf" style="--x:-58px;--y:-6px;--r:-60deg;background:#2ECC71"></i><i class="sc-conf" style="--x:60px;--y:4px;--r:160deg;background:#F2C744"></i><i class="sc-conf" style="--x:-30px;--y:18px;--r:40deg;background:#FF8A3D"></i><span class="sc-tap"></span></div></div>
  <div class="sc-pv-foot">Recommended: Carrier B · £210 · 3 days</div>
 </div>"""
 

@@ -212,6 +212,11 @@ JS = """<script>
       const t = now(), dt = Math.min(1 / 30, t - state.last); state.last = t;
       if (!visible) return;
       const since = t - state.start;
+      // the example card loops every 10 s: blocked, then fixed at ~4 s, reset at ~9.5 s. Read its own clock.
+      const pill = document.querySelector('.sc-pv .sc-pill.sc-a');
+      const anim = pill && pill.getAnimations ? pill.getAnimations().find(a => a.animationName === 'scA') : null;
+      const ph = ((anim && anim.currentTime != null ? anim.currentTime / 1000 : since) % 10 + 10) % 10;
+      const ready = ph > 4.0 && ph < 9.6;
 
       // where to look: the pointer, else the booking card (first seconds), else an idle wandering gaze
       let ty, tp;
@@ -219,7 +224,7 @@ JS = """<script>
         const r = box.getBoundingClientRect();
         ty = Math.max(-1, Math.min(1, (pointer.x - (r.left + r.width / 2)) / 560)) * 0.72;
         tp = Math.max(-1, Math.min(1, (pointer.y - (r.top + r.height / 2)) / 460)) * 0.34;
-      } else if (since < 4.4) { ty = wide() ? 0.68 : 0.15; tp = wide() ? 0.3 : 0.28; }
+      } else if (ph < 4.4) { ty = wide() ? 0.68 : 0.15; tp = wide() ? 0.3 : 0.28; }   // watching the card
       else {
         ty = 0.17 * (Math.sin(t * 0.31) + 0.6 * Math.sin(t * 0.73 + 1.3)) / 1.6;
         tp = 0.05 * (Math.sin(t * 0.27 + 0.5) + 0.5 * Math.sin(t * 0.61)) / 1.5;
@@ -237,8 +242,9 @@ JS = """<script>
       eyes.forEach(({pupil}) => { pupil.position.x = (lookX.x - yaw.x * 0.4) * 0.17; pupil.position.y = -(lookY.x - pitch.x * 0.4) * 0.22; });
 
       // mood: worried while the card is Blocked (until ~3.4 s), happy after; the mouth morphs through flat
-      if (state.hopAt < 0 && since > 3.4) state.hopAt = t;
-      state.mood += ((since > 3.4 ? 1 : 0) - state.mood) * (1 - Math.exp(-dt * 5));
+      if (ready && !state.wasReady && t - (state.hopAt || 0) > 1.2) state.hopAt = t;   // a happy hop each time it's fixed
+      state.wasReady = ready;
+      state.mood += ((ready ? 1 : 0) - state.mood) * (1 - Math.exp(-dt * 5));
       const m = smooth(0, 1, state.mood);
       brows.forEach(b => { b.rotation.z = b.userData.side * (0.38 * (1 - m) - 0.1 * m); b.position.y = 0.55 + 0.05 * m; });
       mouth.scale.y = 1 - 2 * m; mouth.position.y = -0.36 + 0.12 * m;
