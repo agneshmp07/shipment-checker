@@ -72,3 +72,19 @@ def test_no_sample_shortcuts_on_upload_page(app):
     app.switch_page("app_pages/upload_file.py").run()
     labels = [b.label for b in app.button]
     assert not any("sample" in (l or "").lower() for l in labels)
+
+
+def test_home_is_short_with_a_guide(app):
+    md = " ".join(m.value for m in app.markdown)
+    assert "Key terms" not in md and "Everything in Oops-Proof" not in md and "How it works" not in md
+    app.button(key="home-guide").click().run()
+    assert not app.exception
+    assert [t.label for t in app.tabs][:4] == ["Quick start", "Sections", "The 10 rules", "Key terms"]
+
+
+def test_pages_have_a_guide_button_not_a_how_to_box(app):
+    app.switch_page("app_pages/upload_file.py").run()
+    assert not [e for e in app.expander if e.label == "How to use this page"]
+    app.button(key="guide-upload").click().run()
+    assert not app.exception
+    assert any("Checking a bookings file" in m.value for m in app.markdown)

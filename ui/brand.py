@@ -148,11 +148,12 @@ def steps(items: list[tuple[str, str]]):
 
 
 def how_to(page_key: str, items: list[tuple[str, str]]):
-    """'How to use this page' guide; open the first time a page is visited in a session."""
-    first = f"seen-{page_key}" not in st.session_state
-    st.session_state[f"seen-{page_key}"] = True
-    with st.expander("How to use this page", icon=":material/lightbulb:", expanded=first):
-        steps(items)
+    """A small Guide button under the page title; the steps open in a pop-up instead of filling the page."""
+    from ui import guide
+    titles = {"chat": "Booking by chat or voice", "upload": "Checking a bookings file", "market": "The Marketplace"}
+    if st.button("Guide", key=f"guide-{page_key}", icon=":material/menu_book:", type="tertiary",
+                 help="How this page works, in three steps"):
+        guide.page_guide(titles.get(page_key, "How this page works"), items)
 
 
 def page_title(title: str, subtitle: str):

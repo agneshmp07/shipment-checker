@@ -1,13 +1,13 @@
 import streamlit as st
 
-from ui.brand import hero, steps
+from ui import guide
+from ui.brand import hero
 
 hero(
     kicker="Pre-flight check · UK → Germany · France · Netherlands",
     title_html="Every shipment has an oops. <span>We catch it before customs does.</span>",
-    subtitle="Book your shipment by chat, voice or Excel. Before it leaves, we run a pre-flight check against "
-             "10 customs and warehouse rules — so your goods aren't held at customs or reported missing at "
-             "the warehouse — show you exactly how to fix any mistake, and pick the best carrier.",
+    subtitle="Book by chat, voice or Excel. We check it against 10 customs and warehouse rules, fix the "
+             "mistakes and pick the best carrier.",
     chips=["Pre-flight check in seconds", "Plain-English fixes", "Best of 3 carriers", "Voice + AI assistant"],
 )
 
@@ -16,6 +16,12 @@ with st.container(horizontal=True):
         st.switch_page("app_pages/chat_booking.py")
     if st.button("Check a bookings file", icon=":material/upload_file:"):
         st.switch_page("app_pages/upload_file.py")
+    show_guide = st.button("Guide", icon=":material/menu_book:", key="home-guide",
+                           help="Quick start, every section, the 10 rules and key terms")
+if show_guide:                                 # opened outside the row, so the row isn't drawn twice
+    guide.app_guide()
+guide.follow()
+
 
 def _use_example():
     """Send the tapped example to the chat page, and clear the pill for next time."""
@@ -32,62 +38,3 @@ st.pills(
              "2,000 notebooks from Birmingham to Amsterdam, cheapest please"])
 if st.session_state.pop("go_chat", False):
     st.switch_page("app_pages/chat_booking.py")
-
-st.markdown("#### How it works")
-steps([
-    ("Tell us", "Type or speak your shipment in plain English, or upload your Bookings and Items "
-                "sheets. We only ask for what's missing."),
-    ("We check", "10 rules catch the mistakes that cause customs holds and 'missing' cartons. Each "
-                 "problem shows the real numbers, why it matters and a one-tap fix."),
-    ("You ship", "We recommend the best carrier for your priority, explain the trade-off, and give you a "
-                 "plain-English confirmation and next steps."),
-])
-
-st.markdown("#### Everything in Oops-Proof")
-cards = [
-    (":material/chat:", "Book by chat or voice", "Describe your shipment in your own words or tap the mic. "
-     "The assistant asks only for what's missing and updates the checks as you change things.",
-     "app_pages/chat_booking.py", "Start a booking"),
-    (":material/fact_check:", "Check a bookings file", "Upload many bookings at once. See which are ready, "
-     "which need fixing, the most common mistake, and fix them with one tap.",
-     "app_pages/upload_file.py", "Upload a file"),
-    (":material/storefront:", "Marketplace", "Find buyers in Germany, France and the Netherlands, post your "
-     "own listing, see buyers matched to your bookings and message them. Checked sellers get a badge.",
-     "app_pages/trade_connect.py", "Open the marketplace"),
-    (":material/smart_toy:", "AI assistant", "Stuck? Tap Ask AI at the top of any page: “why is BK-107 "
-     "blocked?”, “what's an HS code?”. It answers from your actual results.",
-     None, None),
-]
-cols = st.columns(2)
-for n, (icon, title, text, page, link) in enumerate(cards):
-    with cols[n % 2], st.container(border=True):
-        st.markdown(f"#### {icon} {title}")
-        st.write(text)
-        if page:
-            st.page_link(page, label=link, icon=":material/arrow_forward:")
-        else:
-            st.caption("Look for the **Ask AI** button at the top of every page.")
-
-st.markdown("#### Key terms")
-st.table({
-    "Commercial invoice": "The document listing what's in the shipment, how many and what it's worth. Customs "
-                          "relies on it — Oops-Proof drafts it for you.",
-    "HS code": "The international code that classifies each product for customs (at least 6 digits).",
-    "Declared value": "The total value of the goods as stated on the paperwork.",
-    "Carton / pallet": "A carton is a box of units; a pallet is the platform holding many cartons.",
-    "Customs hold": "When customs stops a shipment until a problem with its paperwork is fixed.",
-    "Delivery appointment": "A booked time slot at the receiving warehouse.",
-    "Transit time": "How many days the shipment takes to arrive once collected.",
-}, border="horizontal")
-
-with st.expander("What we check (the 10 rules)", icon=":material/rule:"):
-    st.markdown(
-        "- **Customs paperwork** — HS codes (the international code customs uses to classify a product), "
-        "declared value vs items, country of origin, and dangerous goods (lithium batteries, aerosols, "
-        "flammable liquids).\n"
-        "- **Counts** — units per carton × cartons = quantity, and booking cartons = item cartons, so the "
-        "warehouse doesn't report anything missing.\n"
-        "- **Weights** — weight per pallet (a pallet is the platform the cartons are stacked on) within the "
-        "carrier's limit, and gross weight at least the weight of the goods.\n"
-        "- **Logistics** — a delivery slot at warehouses, and a ready date that isn't in the past.")
-    st.caption(":red-badge[Red] must be fixed before shipping · :orange-badge[Amber] warning, should be fixed")
