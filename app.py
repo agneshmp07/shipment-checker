@@ -4,7 +4,7 @@ import os
 import streamlit as st
 
 from ui.assistant import render_ask_ai
-from ui import splash
+from ui import mobile, splash
 from ui.brand import global_style
 
 # Streamlit Cloud / HF Spaces secrets -> env vars read by core.llm (never hard-coded).
@@ -21,6 +21,7 @@ st.set_page_config(page_title="Oops-Proof — catch shipment mistakes before cus
                    layout="wide")
 st.logo("assets/logo.svg", size="large")
 global_style()        # hides the hosting toolbar, adds hover effects
+mobile.style()        # phone layout
 if not st.session_state.get("splash_seen"):       # the opening animation, once per visit
     st.html(splash.HTML)
     st.session_state.splash_seen = True

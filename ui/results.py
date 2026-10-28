@@ -96,7 +96,7 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
     # Header: status in plain words and the four numbers people check first
     status_banner(ev)
     cleared = preflight.checkpoint(ev)                # the gate: documents unlock only when it clears
-    with st.container(horizontal=True):
+    with st.container(horizontal=True, key=f"bk-metrics-{key}"):
         st.metric("Pallets", fmt.num(b.pallets), border=True)
         st.metric("Cartons", fmt.num(b.cartons), border=True)
         st.metric("Declared value", fmt.money(b.total_declared_value), border=True)

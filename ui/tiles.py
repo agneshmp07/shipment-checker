@@ -97,7 +97,7 @@ def status_tiles(counts: dict[str, int], source: str):
     prev = seen.get("counts") if seen.get("source") == source else None
     st.session_state.tile_seen = {"source": source, "counts": dict(counts)}
     active = st.session_state.get("tile_filter")
-    with st.container(horizontal=True, gap="small"):
+    with st.container(horizontal=True, gap="small", key="tile-row"):
         for n, (status, (cls, icon, label, empty)) in enumerate(TILES.items()):
             k = counts.get(status, 0)
             share = round(100 * k / total)

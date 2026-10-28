@@ -73,7 +73,7 @@ chat_col, card_col = st.columns([3, 2], gap="large")
 
 # ---- Chat --------------------------------------------------------------------
 with chat_col:
-    history = st.container(height=520)
+    history = st.container(height=520, key="chat-history")
     voice_in = llm.voice_available()
     raw = st.chat_input("Type, or tap the mic and speak…" if voice_in else
                         "Describe your shipment, answer a question, or change something…",

@@ -40,7 +40,7 @@ CSS = """
 .sc-mascot-flat{position:absolute;left:50%;top:50%;width:120px;height:120px;transform:translate(-50%,-50%);
   border-radius:28px;transition:opacity .4s}
 .sc-mascot.live .sc-mascot-flat{opacity:0}
-@media (max-width:760px){.sc-mascot{position:relative;inset:auto;height:300px}}
+@media (max-width:760px){.sc-mascot{position:relative;inset:auto;height:240px}}
 """
 
 JS = """<script>
