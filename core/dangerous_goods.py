@@ -97,7 +97,7 @@ def detect(description: Optional[str], sku: Optional[str], hs_code: Optional[str
 # "lithium" (e.g. wireless earbuds with a charging case). R-06 flags them Red; the seller can clear it
 # by confirming there is no battery and saying so in the description ("no battery").
 BATTERY_DEVICES = [
-    "earbuds", "earphones", "headphones", "headset", "airpods", "bluetooth", "wireless speaker",
+    "charging case", "earbuds", "earphones", "headphones", "headset", "airpods", "bluetooth", "wireless speaker",
     "smartwatch", "smart watch", "fitness tracker", "smartphone", "mobile phone", "laptop", "tablet",
     "e-reader", "electric toothbrush", "electric shaver", "hair clipper", "drone", "e-scooter",
     "electric scooter", "hoverboard", "rechargeable", "cordless", "usb-c powered", "camera",
