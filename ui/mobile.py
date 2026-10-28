@@ -9,6 +9,13 @@ CSS = """<style>
   .sc-mascot{height:240px!important}
 }
 @media (max-width:640px){
+  /* home on a phone: the headline, the carton and the buttons; the longer copy lives in the Guide */
+  .sc-hero .sc-kicker,.sc-hero p,.sc-hero .sc-chips,.sc-side .sc-pv{display:none!important}
+  .sc-hero{padding:22px 18px 10px!important}
+  .sc-mascot{height:210px!important}
+  /* other pages: the title alone, without the grey description under it */
+  [data-testid='stElementContainer']:has([data-testid='stHeading'] h1)+[data-testid='stElementContainer']
+    [data-testid='stCaptionContainer']{display:none}
   [data-testid='stMainBlockContainer']{padding-left:1rem;padding-right:1rem}
   [data-testid='stHeading'] h1{font-size:1.7rem}
   /* example phrases wrap instead of being cut off */
