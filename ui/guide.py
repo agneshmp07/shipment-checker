@@ -1,7 +1,7 @@
 """The Guide: everything a first-time user needs, in one pop-up, so the pages themselves stay short.
 
 `app_guide()` is the full guide (Home's Guide button): quick start, the sections, the 10 rules and key terms.
-`page_guide()` is one page's three steps (the Guide button under each page title)."""
+`page_guide()` is one page's three steps (opened by ui/guide_button.py's Guide button)."""
 from __future__ import annotations
 
 import streamlit as st

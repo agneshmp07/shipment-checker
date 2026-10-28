@@ -10,7 +10,8 @@ from core.chat_agent import (ChatState, Extraction, ItemPatch, handle_message, i
 from core.check import evaluate
 from core.models import DESTINATION_TYPES, ITEM_ORIGIN_COUNTRIES, ORIGIN_CITIES, PRIORITIES, DESTINATIONS
 from core.offline_parser import offline_extract
-from ui.brand import booking_checklist, how_to, page_title
+from ui.brand import booking_checklist, page_title
+from ui.guide_button import how_to
 from ui import preflight
 from ui.results import carriers_or_warning, render_evaluation, status_badge
 from ui.voice import say, transcribe

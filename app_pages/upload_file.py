@@ -17,7 +17,8 @@ from core.diagnosis import fix_all
 from core.excel_export import corrected_workbook
 from core.excel_loader import load_workbook
 from core.rules import RULE_NAMES, TITLES, scorecard
-from ui.brand import how_to, page_title
+from ui.brand import page_title
+from ui.guide_button import how_to
 from ui import fixflow, scan, tiles
 from ui.findings import findings_dialog
 from ui.results import carriers_or_warning, render_evaluation, render_issue

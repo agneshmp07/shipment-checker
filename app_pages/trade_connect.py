@@ -8,7 +8,8 @@ from core.check import evaluate
 from core.trade_connect import (CATEGORIES, Business, Message, Thread, categories_for, demo_reply,
                                 filter_directory, load_directory, match_buyers, prechecked_sellers,
                                 validate_request)
-from ui.brand import how_to, page_title
+from ui.brand import page_title
+from ui.guide_button import how_to
 from ui.results import get_carriers
 
 COUNTRIES = ["United Kingdom", "Germany", "France", "Netherlands"]

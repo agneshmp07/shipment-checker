@@ -147,15 +147,6 @@ def steps(items: list[tuple[str, str]]):
     st.html(f'{_CSS}<div class="sc-steps">{cards}</div>')
 
 
-def how_to(page_key: str, items: list[tuple[str, str]]):
-    """A small Guide button under the page title; the steps open in a pop-up instead of filling the page."""
-    from ui import guide
-    titles = {"chat": "Booking by chat or voice", "upload": "Checking a bookings file", "market": "The Marketplace"}
-    if st.button("Guide", key=f"guide-{page_key}", icon=":material/menu_book:", type="tertiary",
-                 help="How this page works, in three steps"):
-        guide.page_guide(titles.get(page_key, "How this page works"), items)
-
-
 def page_title(title: str, subtitle: str):
     st.title(title)
     st.caption(subtitle)
