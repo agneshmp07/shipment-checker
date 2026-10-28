@@ -32,8 +32,8 @@ WHY = {
     "R-06": "Lithium batteries, aerosols and flammable liquids are dangerous goods. They need "
             "special packing and paperwork; undeclared, the carrier refuses them and " +
             CUSTOMS_HOLD[0].lower() + CUSTOMS_HOLD[1:],
-    "R-07": "The declared gross weight doesn't fit the goods: lighter than the goods is impossible, and far "
-            "heavier usually means a typo. The carrier will re-weigh it and may charge extra or delay it.",
+    "R-07": "The declared gross weight is lighter than the goods themselves, which is impossible. "
+            "The carrier will almost certainly re-weigh it and may charge extra or delay it.",
     "R-08": "Warehouses only accept deliveries in a booked time slot; without one the driver "
             "may be turned away and the delivery rebooked at extra cost.",
     "R-09": "Country of origin (where the product was made, not where it ships from) decides "
@@ -44,7 +44,7 @@ TITLES = {
     "R-01": "HS code missing or not valid", "R-02": "Declared value doesn't match items",
     "R-03": "Units per carton × cartons ≠ quantity", "R-04": "Booking cartons ≠ item cartons",
     "R-05": "Pallets too heavy for carrier", "R-06": "Possible dangerous goods",
-    "R-07": "Gross weight doesn't fit the goods", "R-08": "No delivery appointment at warehouse",
+    "R-07": "Gross weight lighter than the goods", "R-08": "No delivery appointment at warehouse",
     "R-09": "Country of origin missing", "R-10": "Ready date is in the past",
 }
 # Neutral names, for "Passed: ..." lists.
@@ -293,29 +293,39 @@ def r07_gross_weight(b: Booking) -> list[Issue]:
     goods = goods_weight(b)
     if goods is None or b.total_gross_weight_kg is None:
         return []
-    gross = b.total_gross_weight_kg
+    if b.total_gross_weight_kg + 1e-9 >= goods:
+        return []
     parts = " + ".join(f"{fmt.num(it.quantity)} × {fmt.kg(it.unit_weight_kg)}" for it in b.items[:4])
-    parts += " + …" if len(b.items) > 4 else ""
-    if gross + 1e-9 < goods:
-        return [_issue("R-07", b,
-                       f"Total gross weight is {fmt.kg(gross)}, but the goods alone weigh "
-                       f"{fmt.kg(goods)} ({parts}). Short by {fmt.kg(goods - gross)}.",
-                       f"Re-weigh the shipment. Gross weight includes goods, cartons and pallets, so it must "
-                       f"be at least {fmt.kg(goods)}; also check each item's unit weight and quantity.",
-                       title="Gross weight lighter than the goods")]
-    top = heaviest_plausible(b, goods)
-    if gross > top + 1e-9:
-        pallets = f" + {fmt.num(b.pallets)} pallet{'s' if b.pallets != 1 else ''} × {PALLET_MAX_KG} kg"             if b.pallets and b.pallets > 0 else ""
-        return [_issue("R-07", b,
-                       f"Total gross weight is {fmt.kg(gross)}, but the goods weigh only {fmt.kg(goods)} "
-                       f"({parts}){f', {gross / goods:.1f}× as much' if goods > 0 else ''}. Even with generous packaging "
-                       f"({fmt.kg(goods)} + 60% for cartons{pallets} + {SLACK_KG} kg) it should be at most "
-                       f"about {fmt.kg(top)}.",
-                       f"Re-weigh the shipment and correct the gross weight; it may have an extra digit. "
-                       f"If it really weighs {fmt.kg(gross)}, check each item's unit weight and quantity, "
-                       f"since one of them is probably too low.",
-                       title="Gross weight far heavier than the goods")]
-    return []
+    return [_issue("R-07", b,
+                   f"Total gross weight is {fmt.kg(b.total_gross_weight_kg)}, but the goods alone weigh "
+                   f"{fmt.kg(goods)} ({parts}{' + …' if len(b.items) > 4 else ''}). "
+                   f"Short by {fmt.kg(goods - b.total_gross_weight_kg)}.",
+                   f"Re-weigh the shipment. Gross weight includes goods, cartons and pallets, so it must "
+                   f"be at least {fmt.kg(goods)}; also check each item's unit weight and quantity.")]
+
+
+# Not a rule (R-07 only asks for "at least the goods"), but a gross weight far above the goods is
+# usually a typo. At most: goods + 60% for cartons and fill + 30 kg per empty pallet + 25 kg slack.
+PACKING_SHARE, PALLET_MAX_KG, SLACK_KG = 0.6, 30, 25
+
+
+def heaviest_plausible(b: Booking, goods: float) -> float:
+    pallets = b.pallets if b.pallets and b.pallets > 0 else 0
+    return goods * (1 + PACKING_SHARE) + PALLET_MAX_KG * pallets + SLACK_KG
+
+
+def weight_note(b: Booking) -> Optional[str]:
+    """A heads-up (never a rule break) when the gross weight is far heavier than the goods."""
+    goods = goods_weight(b)
+    if not goods or b.total_gross_weight_kg is None:
+        return None
+    gross, top = b.total_gross_weight_kg, heaviest_plausible(b, goods)
+    if gross <= top + 1e-9:
+        return None
+    return (f"Worth a check: the gross weight {fmt.kg(gross)} is {gross / goods:.1f}× the goods "
+            f"({fmt.kg(goods)}). Even with generous packaging it would be about {fmt.kg(top)} at most, so it "
+            f"may have an extra digit, or an item's unit weight may be too low. This doesn't break R-07 "
+            f"and doesn't change the status.")
 
 
 def r08_delivery_appointment(b: Booking) -> list[Issue]:

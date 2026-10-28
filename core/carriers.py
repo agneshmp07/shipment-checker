@@ -182,4 +182,20 @@ def recommend(b: Booking, carriers: list[CarrierOption]) -> Recommendation:
     if not b.seller_priority:
         rec.reason = "No priority given, so Balanced is used. " + rec.reason
     rec.all_options = ranked + eliminated
+    rec.ruled_out = _ruled_out(b, route, priority, ranked[0], wpp)
     return rec
+
+
+def _ruled_out(b: Booking, route: list[CarrierOption], priority: str, win: CarrierResult, wpp: float) -> str:
+    """If the weight limit (R-05) rules out the carrier this priority would pick, say so, and how many
+    pallets would unlock it."""
+    every = [CarrierResult(option=c, status="Eligible", total_cost=c.price_per_pallet * b.pallets) for c in route]
+    ideal = _rank(every, priority)[0].option
+    if ideal == win.option:
+        return ""
+    need = math.ceil(b.total_gross_weight_kg / ideal.max_weight_per_pallet_kg - 1e-9)
+    return (f"R-05 rules out {label(ideal)}, the {priority} pick: {fmt.kg(wpp)} per pallet is over its "
+            f"{fmt.kg(ideal.max_weight_per_pallet_kg)} max, so {win.option.carrier} is recommended instead. "
+            f"To use {ideal.carrier}, spread the goods over {need} pallets ({fmt.kg(b.total_gross_weight_kg / need)} "
+            f"each): {need} × {fmt.money(ideal.price_per_pallet)} = {fmt.money(need * ideal.price_per_pallet)}, "
+            f"{fmt.num(ideal.transit_days)} days, {fmt.num(ideal.on_time_rate)}% on time.")

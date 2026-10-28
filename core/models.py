@@ -120,3 +120,4 @@ class Recommendation(BaseModel):
     trade_off: str = ""
     all_options: list[CarrierResult] = Field(default_factory=list)
     weight_per_pallet: Optional[float] = None
+    ruled_out: str = ""         # R-05 ruled out the carrier the priority points to, and how to unlock it

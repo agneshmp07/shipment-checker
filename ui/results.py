@@ -12,10 +12,9 @@ from core.carriers import label, load_carriers
 from core.check import Evaluation, evaluate
 from core.diagnosis import apply_fix, diagnose
 from core.confirmation import DELIVERY_ASSUMPTION
-from core.dangerous_goods import possible_battery
 from core.labels import MAX_LABELS, label_count, labels_pdf
 from core.report import html_report
-from core.rules import scorecard
+from core.rules import scorecard, weight_note
 from core.trade_connect import load_directory, match_buyers
 from ui.brand import carrier_cards, rule_chips, status_banner
 from ui import preflight
@@ -149,14 +148,10 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
                                "check it and enter the right value yourself.")
         for n, issue in enumerate(remaining):
             render_issue(issue, f"{key}-issue-{n}", ev, on_fix, msg_key=key)
-        flagged_dg = {i.item_sku for i in ev.issues if i.rule_id == "R-06"}
-        for it in b.items:
-            word = possible_battery(it.description) if it.sku not in flagged_dg else None
-            if word:
-                st.warning(f"**Please confirm — possible built-in lithium battery:** {it.sku} "
-                           f"({it.description}) looks like a battery-powered product (“{word}”). If it has a "
-                           "lithium battery, it needs the carrier's dangerous-goods paperwork. This doesn't "
-                           "change the status.", icon=":material/battery_alert:")
+        if rec.ruled_out:
+            st.info(rec.ruled_out, icon=":material/scale:")
+        if (note := weight_note(b)):
+            st.info(note, icon=":material/scale:")
         if llm.available():
             flagged = {i.item_sku for i in ev.issues if i.rule_id == "R-06"}
             unflagged = tuple((it.sku, it.description) for it in b.items
@@ -170,6 +165,8 @@ def render_evaluation(ev: Evaluation, key: str, on_fix: Optional[Callable[[str],
     with t_carrier:
         if rec.winner:
             st.markdown(f"**{rec.headline}**")
+            if rec.ruled_out:
+                st.info(rec.ruled_out, icon=":material/scale:")
             carrier_cards(rec)
             st.write(rec.reason)
             if rec.trade_off:

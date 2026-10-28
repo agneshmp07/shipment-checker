@@ -28,7 +28,7 @@ The 10 rules (Red = must fix before shipping, Amber = warning):
 R-01 HS code of at least 6 digits (Red) · R-02 declared value = sum of quantity x unit price within 1% (Red)
 · R-03 units per carton x cartons = quantity (Red) · R-04 booking cartons = sum of item cartons (Red)
 · R-05 weight per pallet within the chosen carrier's limit (Red) · R-06 no lithium batteries, aerosols or
-flammable liquids (Red) · R-07 gross weight fits the goods: at least the goods weight, at most goods + 60% packaging + 30 kg/pallet + 25 kg (Amber) · R-08 warehouse deliveries need a
+flammable liquids (Red) · R-07 gross weight >= goods weight (Amber) · R-08 warehouse deliveries need a
 booked delivery slot (Amber) · R-09 every item needs a country of origin (Amber) · R-10 ready date not in
 the past (Amber).
 Carriers: A (economy, cheapest, 5 days, 92% on time, max 500 kg/pallet), B (standard, 3 days, 95%, 750 kg),

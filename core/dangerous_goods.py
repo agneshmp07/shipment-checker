@@ -82,6 +82,10 @@ def detect(description: Optional[str], sku: Optional[str], hs_code: Optional[str
             if m:
                 signals.append(f"{field} contains '{kw}' ({cat})")
                 t = t[:m.start()] + " " + t[m.end():]   # don't double-report 'lighter' in 'lighter fluid'
+    word = possible_battery(description)
+    said_none = any(p.search((description or "").lower()) for p in _NEG)    # e.g. "no battery"
+    if word and not said_none and not any("batter" in s for s in signals):
+        signals.append(f"Description says '{word}': this kind of product usually has a built-in lithium battery")
     digits = re.sub(r"\D", "", hs_code or "")
     for prefix, what in HS_PREFIXES.items():
         if digits.startswith(prefix):
@@ -89,8 +93,9 @@ def detect(description: Optional[str], sku: Optional[str], hs_code: Optional[str
     return signals
 
 
-# Products that usually contain a built-in lithium battery. These are not blocked (plenty of
-# sellers ship them with the right paperwork), but the seller is asked to confirm.
+# Products that usually contain a built-in lithium battery even when the description doesn't say
+# "lithium" (e.g. wireless earbuds with a charging case). R-06 flags them Red; the seller can clear it
+# by confirming there is no battery and saying so in the description ("no battery").
 BATTERY_DEVICES = [
     "earbuds", "earphones", "headphones", "headset", "airpods", "bluetooth", "wireless speaker",
     "smartwatch", "smart watch", "fitness tracker", "smartphone", "mobile phone", "laptop", "tablet",

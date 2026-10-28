@@ -60,8 +60,15 @@ def test_more_names_are_blocked(desc):
 
 @pytest.mark.parametrize("desc,word", [("Wireless earbuds", "earbuds"), ("Bluetooth speaker", "bluetooth"),
                                        ("Rechargeable torch", "rechargeable"), ("Kids drone", "drone")])
-def test_battery_devices_need_confirming_not_blocking(desc, word):
-    assert possible_battery(desc) == word and detect(desc, None, None) == []
+def test_battery_devices_are_flagged_red(desc, word):
+    # the answer key: wireless earbuds with a charging case are R-06 (hidden lithium battery)
+    assert possible_battery(desc) == word
+    assert detect(desc, None, None) == [f"Description says '{word}': this kind of product usually has a "
+                                        "built-in lithium battery"]
+
+
+def test_no_battery_clears_a_device():
+    assert detect("Bluetooth speaker, no battery (mains powered)", None, None) == []
 
 
 @pytest.mark.parametrize("desc", ["Ceramic mug", "Phone case, silicone", "Battery-free LED lamp"])

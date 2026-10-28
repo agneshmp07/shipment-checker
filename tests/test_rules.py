@@ -192,22 +192,16 @@ def test_r07_fail():
     assert i.title == "Gross weight lighter than the goods"
 
 
-def test_r07_heavy_but_plausible_passes():
+def test_heavy_but_plausible_has_no_note():
     # 540 kg goods on 3 pallets: at most 540 × 1.6 + 3 × 30 + 25 = 979 kg
-    assert rules.r07_gross_weight(booking(total_gross_weight_kg=979)) == []
+    assert rules.weight_note(booking(total_gross_weight_kg=979)) is None
 
 
-def test_r07_far_too_heavy():
-    (i,) = rules.r07_gross_weight(booking(total_gross_weight_kg=6200))    # an extra digit on 620
-    assert i.severity == "Amber" and i.title == "Gross weight far heavier than the goods"
-    assert "6,200 kg" in i.explanation and "979 kg" in i.explanation and i.fix_action is None
-
-
-def test_r07_too_heavy_has_no_guessed_fix():
-    from core import diagnosis
-    b = booking(total_gross_weight_kg=6200)
-    roots, rest = diagnosis.diagnose(b, rules.r07_gross_weight(b))
-    assert roots == [] and [i.rule_id for i in rest] == ["R-07"]
+def test_far_too_heavy_is_a_note_not_a_rule_break():
+    b = booking(total_gross_weight_kg=6200)                  # an extra digit on 620
+    assert rules.r07_gross_weight(b) == []                   # R-07 only asks for "at least the goods"
+    note = rules.weight_note(b)
+    assert "6,200 kg" in note and "979 kg" in note and "doesn't change the status" in note
 
 
 # R-08 ------------------------------------------------------------------------
@@ -273,3 +267,31 @@ def test_scorecard_counts_passes_breaks_and_unchecked():
 def test_scorecard_clean_booking_passes_all_ten():
     b = booking()
     assert all(r["state"] == "pass" for r in rules.scorecard(b, rules.run_rules(b, STANDIN_CARRIERS, TODAY)))
+
+
+# R-05 rules out the priority's own pick ---------------------------------------
+def test_ruled_out_carrier_is_explained_with_the_pallets_to_unlock_it():
+    from core.carriers import load_carriers, recommend
+    # Answer key BK-043: Fastest, 830 kg on 2 pallets = 415 kg, over Carrier C's 400 kg
+    b = booking(seller_priority="Fastest", destination_city="Paris", destination_country="France",
+                pallets=2, total_gross_weight_kg=830)
+    rec = recommend(b, load_carriers())
+    assert rec.winner.option.carrier == "Carrier B"
+    assert "R-05 rules out Carrier C" in rec.ruled_out and "3 pallets" in rec.ruled_out
+    assert "£990.00" in rec.ruled_out
+
+
+def test_nothing_ruled_out_when_the_pick_fits():
+    from core.carriers import load_carriers, recommend
+    assert recommend(booking(), load_carriers()).ruled_out == ""
+
+
+def test_dangerous_goods_get_no_carrier():
+    # Answer key BK-015 / BK-044: R-06 means reject, so no carrier is recommended
+    from core.carriers import load_carriers
+    from core.check import evaluate
+    b = booking([item(description="Wireless earbuds with charging case, Bluetooth", hs_code="851830")])
+    ev = evaluate(b, load_carriers(), date(2026, 10, 26))
+    assert ev.status == "Blocked" and ev.recommendation.winner is None
+    assert "R-06" in ev.recommendation.reason
+    assert all(r.status == "Eliminated" for r in ev.recommendation.all_options)
