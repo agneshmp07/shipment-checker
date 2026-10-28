@@ -189,6 +189,25 @@ def test_r07_pass_equal_is_ok():
 def test_r07_fail():
     (i,) = rules.r07_gross_weight(booking(total_gross_weight_kg=400))
     assert i.severity == "Amber" and "400 kg" in i.explanation and "540 kg" in i.explanation
+    assert i.title == "Gross weight lighter than the goods"
+
+
+def test_r07_heavy_but_plausible_passes():
+    # 540 kg goods on 3 pallets: at most 540 × 1.6 + 3 × 30 + 25 = 979 kg
+    assert rules.r07_gross_weight(booking(total_gross_weight_kg=979)) == []
+
+
+def test_r07_far_too_heavy():
+    (i,) = rules.r07_gross_weight(booking(total_gross_weight_kg=6200))    # an extra digit on 620
+    assert i.severity == "Amber" and i.title == "Gross weight far heavier than the goods"
+    assert "6,200 kg" in i.explanation and "979 kg" in i.explanation and i.fix_action is None
+
+
+def test_r07_too_heavy_has_no_guessed_fix():
+    from core import diagnosis
+    b = booking(total_gross_weight_kg=6200)
+    roots, rest = diagnosis.diagnose(b, rules.r07_gross_weight(b))
+    assert roots == [] and [i.rule_id for i in rest] == ["R-07"]
 
 
 # R-08 ------------------------------------------------------------------------

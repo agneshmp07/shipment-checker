@@ -270,8 +270,8 @@ EMPTY_PALLET_KG = 25    # typical empty wooden pallet (EUR/UK standard pallets w
 
 def _diag_r07(b: Booking) -> Optional[RootCause]:
     goods, gross = rules.goods_weight(b), b.total_gross_weight_kg
-    if goods is None or gross is None:
-        return None
+    if goods is None or gross is None or gross >= goods:
+        return None    # only a too-low gross weight has a sure estimate; too heavy needs a re-weigh
     # A low gross weight is fixed by re-weighing, never by shrinking a product's weight:
     # a seller's unit weight is a fact about the product, and a smaller one hides the problem.
     cands = []
